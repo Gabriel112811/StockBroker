@@ -130,6 +130,12 @@ Dein Team
 
 # --- Beispielaufrufe (zum Testen) ---
 if __name__ == "__main__":
+    import os
+
+    os.environ["GMAIL_USER"] = "rick.dercastle@gmail.com"
+    os.environ["GMAIL_APP_PASSWORD"] = "yyjwsvorwyctvsmv"
+    SENDER_EMAIL = "rick.dercastle@gmail.com"
+    SENDER_PASSWORD = "yyjwsvorwyctvsmv"
     # WICHTIG: Setze zuerst die Umgebungsvariablen:
     # export GMAIL_USER="deine.email@gmail.com"
     # export GMAIL_APP_PASSWORD="deinapppasswort"

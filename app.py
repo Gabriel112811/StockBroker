@@ -132,7 +132,7 @@ order_scheduler.add_job(scheduled_order_processing_job, 'interval', seconds=60)
 order_scheduler.start()
 
 leaderboard_scheduler = BackgroundScheduler(daemon=True)
-leaderboard_scheduler.add_job(scheduled_order_processing_job, 'interval', seconds=60)
+leaderboard_scheduler.add_job(scheduled_order_processing_job, 'interval', seconds=600)
 leaderboard_scheduler.start()
 
 # -- Konstanten für Dropdown-Optionen beim Graph --
@@ -493,7 +493,6 @@ def generate_stock_plotly_chart(ticker_symbol, period="1y", interval="1d", quali
 
     return chart_html, error_msg, company_name
 
-
 def yfinance_ticker_is_valid(ticker_symbol: str) -> bool:
     """
     Überprüft zuverlässiger, ob ein Ticker auf yfinance gültig ist und Marktdaten hat.
@@ -519,7 +518,6 @@ def yfinance_ticker_is_valid(ticker_symbol: str) -> bool:
         # Jede Exception (z.B. HTTP-Fehler bei ungültigen Tickern) bedeutet,
         # dass der Ticker nicht gültig ist.
         return False
-
 
 @app.route('/', methods=['GET'])
 def landing_page():
@@ -681,9 +679,6 @@ def stock_detail_page(ticker_symbol):
                            available_qualities=AVAILABLE_QUALITIES)
 
 
-
-
-# Ersetzen Sie Ihre bestehende leaderboard_page-Funktion durch diese
 @app.route('/leaderboard')
 @login_required
 def leaderboard_page():
@@ -754,47 +749,6 @@ def api_refresh_depot():
     return jsonify({"success": True, "message": "Erfolgreich!"})
 
 
-@app.route('/test_graph')
-def test_graph_page():
-    # Use a common ticker for testing, e.g., AAPL or one passed as arg
-    fixed_ticker = request.args.get("ticker", "AAPL").upper()
-    selected_period = request.args.get("period", "6mo")
-    selected_quality = request.args.get("quality", "high")
-    remove_gaps_str = request.args.get('remove_gaps', 'on')
-    remove_gaps_bool = remove_gaps_str == 'on'
-
-    if not any(p[0] == selected_period for p in AVAILABLE_PERIODS): selected_period = '6mo'
-    if not any(q[0] == selected_quality for q in AVAILABLE_QUALITIES): selected_quality = 'high'
-
-    actual_period, actual_interval, adjustment_note = determine_actual_interval_and_period(selected_period, selected_quality)
-
-    chart_html, error_msg, company_name = generate_stock_plotly_chart(fixed_ticker,
-                                                                      period=actual_period,
-                                                                      interval=actual_interval,
-                                                                      quality_note=adjustment_note,
-                                                                      remove_gaps=remove_gaps_bool)
-    # Logic to display company name if ticker is not the default
-    if fixed_ticker != "AAPL" and not company_name or company_name == fixed_ticker:
-        basic_info, _ = get_stock_basic_info_yfinance(fixed_ticker)
-        if basic_info and basic_info.get('name'):
-            company_name = basic_info.get('name')
-
-    return render_template('test_graph_page.html',
-                           ticker=fixed_ticker,
-                           company_name=company_name,
-                           chart_html=chart_html,
-                           error=error_msg,
-                           current_period=selected_period,
-                           current_quality=selected_quality,
-                           current_remove_gaps=remove_gaps_bool,
-                           actual_period_used=actual_period,
-                           actual_interval_used=actual_interval,
-                           available_periods=AVAILABLE_PERIODS,
-                           available_qualities=AVAILABLE_QUALITIES)
-
-
-# Fügen Sie diese Route in Ihrer app.py ein oder ersetzen Sie die existierende
-
 @app.route('/my_orders')
 @login_required
 def my_orders_page():
@@ -819,12 +773,7 @@ def my_orders_page():
     return render_template('my_orders.html', open_orders=open_orders, closed_orders=closed_orders, prices=prices)
 
 
-
-
-
 if __name__ == '__main__':
     # siehe init_app_data()
-
-    # Flask-App starten
-    # use_reloader=False ist wichtig, damit der Scheduler nur einmal startet!
+    # use_reloader=False ist wichtig, damit der Scheduler nur einmal startet
     app.run(debug=True, use_reloader=False)

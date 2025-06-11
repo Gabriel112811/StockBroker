@@ -277,7 +277,7 @@ class ENDPOINT:
 
         try:
             # Speichere den Token in der neuen Tabelle
-            sql = "INSERT INTO password_resets (token, user_id_fk, expires_at) VALUES (?, ?, ?)"
+            sql = "INSERT INTO login_tokens (token, user_id_fk, expires_at) VALUES (?, ?, ?)"
             cursor.execute(sql, (token, user_id, expires_at.strftime('%Y-%m-%d %H:%M:%S')))
 
             # --- HIER WÜRDE DER E-MAIL-VERSAND STATTFINDEN ---
@@ -301,7 +301,7 @@ class ENDPOINT:
         output = UTILITIES.get_base_protocol()
         cursor = conn.cursor()
 
-        sql = "SELECT expires_at FROM password_resets WHERE token = ?"
+        sql = "SELECT expires_at FROM login_tokens WHERE token = ?"
         cursor.execute(sql, (token,))
         result = cursor.fetchone()
 
@@ -331,7 +331,7 @@ class ENDPOINT:
 
         cursor = conn.cursor()
         # Hole die User-ID, die zum Token gehört
-        cursor.execute("SELECT user_id_fk FROM password_resets WHERE token = ?", (token,))
+        cursor.execute("SELECT user_id_fk FROM login_tokens WHERE token = ?", (token,))
         result = cursor.fetchone()
 
         if result is None:
@@ -350,7 +350,7 @@ class ENDPOINT:
             cursor.execute(update_sql, (new_hashed_password, new_salt, user_id))
 
             # Lösche den benutzten Token, damit er nicht wiederverwendet werden kann
-            delete_sql = "DELETE FROM password_resets WHERE token = ?"
+            delete_sql = "DELETE FROM login_tokens WHERE token = ?"
             cursor.execute(delete_sql, (token,))
 
             output["success"] = True
