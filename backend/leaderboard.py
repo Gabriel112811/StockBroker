@@ -12,6 +12,8 @@ import pandas as pd
 from datetime import datetime
 from collections import defaultdict
 
+from depot_system import DepotEndpoint
+
 
 class LeaderboardEndpoint:
     """
@@ -51,7 +53,7 @@ class LeaderboardEndpoint:
         return paginated_data
 
     @staticmethod
-    def update_net_worth_for_user(conn: sqlite3.Connection, username: str) -> dict:
+    def update_net_worth_for_user(conn: sqlite3.Connection, user_id: int) -> bool :
         """
         Berechnet und aktualisiert das Gesamtvermögen für EINEN einzelnen Benutzer.
         Gibt das Ergebnis als Dictionary zurück.
@@ -59,38 +61,11 @@ class LeaderboardEndpoint:
         cursor = conn.cursor()
 
         # 1. Hole Cash und User-ID des Benutzers
-        cursor.execute("SELECT user_id, money FROM all_users WHERE username = ?", (username,))
-        user_data = cursor.fetchone()
-        if not user_data:
-            return {"success": False, "message": "Benutzer nicht gefunden."}
-        user_id, cash_balance = user_data
+        depot_data = DepotEndpoint.get_depot_details(conn, user_id)
+        if depot_data is None:
+            return False
 
-        # 2. Hole alle Positionen des Benutzers aus dem Depot
-        cursor.execute("SELECT ticker, quantity FROM stock_depot WHERE user_id_fk = ?", (user_id,))
-        positions = cursor.fetchall()
-
-        portfolio_value = 0.0
-        if positions:
-            # Hole aktuelle Preise für alle Ticker im Portfolio
-            tickers = [pos[0] for pos in positions]
-            try:
-                # Batch-Download für bessere Performance
-                data = yf.download(tickers, period="1d", progress=False)
-                if data.empty:
-                    raise ValueError("Keine Preisdaten von yfinance erhalten.")
-
-                # Extrahiere den letzten Schlusskurs für jeden Ticker
-                latest_prices = data['Close'].iloc[-1]
-
-                for ticker, quantity in positions:
-                    price = latest_prices.get(ticker)
-                    if price:
-                        portfolio_value += quantity * price
-            except Exception as e:
-                return {"success": False, "message": f"Fehler beim Abrufen der Aktienkurse: {e}"}
-
-        # 3. Berechne Gesamtvermögen
-        net_worth = cash_balance + portfolio_value
+        net_worth = depot_data['total_net_worth']
 
         # 4. Aktualisiere oder füge den Eintrag im Leaderboard hinzu (Upsert)
         now = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
@@ -103,12 +78,7 @@ class LeaderboardEndpoint:
         """
         cursor.execute(sql_upsert, (user_id, username, net_worth, now))
 
-        return {
-            "success": True,
-            "username": username,
-            "net_worth": round(net_worth, 2),
-            "message": "Gesamtvermögen erfolgreich aktualisiert."
-        }
+        return True
 
     @staticmethod
     def update_all_net_worths(conn: sqlite3.Connection) -> dict:

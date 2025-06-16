@@ -80,6 +80,11 @@
             justify-content: space-between;
             align-items: center;
         }
+        /* NEU: Farbe für nicht-handelbare Suchergebnis-Titel */
+        .search-result-item h3 {
+            color: #6c757d;
+        }
+
 
         /* =================================== */
         /* ===         DARK MODE           === */
@@ -118,21 +123,41 @@
         }
 
         /* --- Formulare & Eingabefelder (KORRIGIERT) --- */
-        .dark-mode .form-control,
-        .dark-mode .form-group select {
-            background-color: #2a3b4d;  /* Dunkler Hintergrund jetzt als Standard */
+        .dark-mode .form-group input[type="email"],
+        .dark-mode .form-group input[type="password"],
+        .dark-mode .form-group input[type="text"],
+        .dark-mode .form-group input[type="number"],
+        .dark-mode .form-group select,
+        .dark-mode .form-control {
+            background-color: #3d4f61;
             color: #e0e0e0;
-            border: 1px solid #3d4f61; /* Standard-Rand */
+            border: 1px solid #2a3b4d;
         }
+
+        .dark-mode .form-group input[type="email"]:focus,
+        .dark-mode .form-group input[type="password"]:focus,
+        .dark-mode .form-group input[type="text"]:focus,
+        .dark-mode .form-group input[type="number"]:focus,
+        .dark-mode .form-group select:focus,
+        .dark-mode .form-control:focus {
+            background-color: #3d4f61;
+            border-color: #4a90e2;
+            box-shadow: 0 0 0 0.25rem rgba(74, 144, 226, 0.2);
+        }
+
         .dark-mode .form-control::placeholder {
             color: #8a99a8;
         }
-        .dark-mode .form-control:focus,
-        .dark-mode .form-group select:focus {
-            background-color: #3d4f61; /* Etwas hellerer Hintergrund bei Fokus */
-            border-color: #4a90e2;     /* Blauer Rand bei Fokus */
-            box-shadow: 0 0 0 0.25rem rgba(74, 144, 226, 0.2);
+
+        /* --- Buttons (KORRIGIERT) --- */
+        .dark-mode a.form-button {
+            color: white !important; /* Verhindert "blau auf blau" bei Links als Buttons */
         }
+        .dark-mode span.form-button {
+            background-color: #5a6268 !important; /* Überschreibt inline style für Lesbarkeit */
+            color: white !important;
+        }
+
 
         /* --- Tabellen --- */
         .dark-mode .table {
@@ -153,18 +178,29 @@
             background-color: #1a2026;
         }
 
-        /* --- Spezifische Container (KORRIGIERT) --- */
+        /* --- Spezifische Container --- */
         .dark-mode .chart-container {
             background-color: transparent;
         }
         .dark-mode .info-summary-box {
             background-color: #1a2026;
         }
-        /* NEU: Regel für Suchergebnis-Boxen */
+
         .dark-mode .search-result-item {
             background-color: #1a2026;
             border: 1px solid #2a3b4d;
         }
+        /* NEU: Farbe für nicht-handelbare Titel im Dark Mode */
+        .dark-mode .search-result-item h3 {
+            color: #999999;
+        }
+        .dark-mode .search-result-item h3 a {
+            color: #ffffff;
+        }
+        .dark-mode .search-result-item p {
+            color: #cdd3da !important;
+        }
+
 
         /* --- Allgemeine Texte & Info-Boxen --- */
         .dark-mode p, .dark-mode span, .dark-mode label {
@@ -174,10 +210,6 @@
             background-color: rgba(74, 144, 226, 0.1);
             color: #a3c9f5;
             border: 1px solid rgba(74, 144, 226, 0.2);
-        }
-        .dark-mode .search-result-item {
-            background-color: #1a2026;
-            border-color: #2a3b4d;
         }
 
     </style>

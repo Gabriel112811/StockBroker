@@ -477,27 +477,28 @@ def determine_actual_interval_and_period(selected_period, selected_quality):
                            f"auf '{period_display_actual}' angepasst, um Intervall '{actual_interval}' zu unterstützen.")
     return actual_period, actual_interval, adjustment_note
 
-def generate_stock_plotly_chart(ticker_symbol, period="1y", interval="1d", quality_note=None, remove_gaps=True):
+def generate_stock_plotly_chart(ticker_symbol, period="1y", interval="1d", quality_note=None, remove_gaps=True, dark_mode=False):
     chart_html = None
     error_msg = quality_note if quality_note else None
     company_name = ticker_symbol
 
     try:
         stock = yf.Ticker(ticker_symbol)
-        info_temp = stock.info # Versuch, den Namen zu bekommen
+        info_temp = stock.info
         if info_temp and (info_temp.get('longName') or info_temp.get('shortName')):
             company_name = info_temp.get('longName', info_temp.get('shortName', ticker_symbol))
-        elif info_temp and info_temp.get('market') == 'cccrypto_market': # For crypto, name might be in 'name'
-             company_name = info_temp.get('name', company_name)
+        elif info_temp and info_temp.get('market') == 'cccrypto_market':
+            company_name = info_temp.get('name', company_name)
 
-
-        # prepost=False, da es sonst zu Problemen mit Wochenend-Lücken kommen kann
         hist_data = stock.history(period=period, interval=interval, auto_adjust=True, prepost=False)
 
         if hist_data.empty:
             current_err = f"Keine Kursdaten für '{ticker_symbol}' mit Periode '{period}' und Intervall '{interval}' gefunden."
             error_msg = (error_msg + " | " if error_msg else "") + current_err
         else:
+            font_color = '#cdd3da' if dark_mode else '#1c1e21'
+            grid_color = 'rgba(255, 255, 255, 0.1)' if dark_mode else 'rgba(0, 0, 0, 0.1)'
+
             fig = go.Figure()
             fig.add_trace(go.Candlestick(x=hist_data.index,
                                          open=hist_data['Open'], high=hist_data['High'],
@@ -505,52 +506,43 @@ def generate_stock_plotly_chart(ticker_symbol, period="1y", interval="1d", quali
                                          name=f'{ticker_symbol}'))
 
             period_display = next((p[1] for p in AVAILABLE_PERIODS if p[0] == period), period)
-            interval_map_for_display = {"1m":"1 Min", "2m":"2 Min", "5m":"5 Min", "15m":"15 Min", "30m":"30 Min",
-                                        "60m":"1 Std", "1h":"1 Std", "90m":"90 Min", "1d":"Täglich",
-                                        "1wk":"Wöchentlich", "1mo":"Monatlich", "3mo":"Quartalsweise"}
+            interval_map_for_display = {"1m": "1 Min", "2m": "2 Min", "5m": "5 Min", "15m": "15 Min",
+                                        "30m": "30 Min", "60m": "1 Std", "1h": "1 Std", "90m": "90 Min",
+                                        "1d": "Täglich", "1wk": "Wöchentlich", "1mo": "Monatlich",
+                                        "3mo": "Quartalsweise"}
             interval_display = interval_map_for_display.get(interval, interval)
 
             fig.update_layout(
                 title=f'Kurs: {company_name} ({ticker_symbol})<br><span style="font-size:0.8em;">Zeitraum: {period_display}, Auflösung: {interval_display}</span>',
                 xaxis_title='Datum / Uhrzeit', yaxis_title='Preis',
                 xaxis_rangeslider_visible=False,
-                margin=dict(l=50, r=20, t=80, b=50) # Adjusted margins
+                margin=dict(l=50, r=20, t=80, b=50),
+                paper_bgcolor='rgba(0,0,0,0)',
+                plot_bgcolor='rgba(0,0,0,0)',
+                font=dict(color=font_color),
+                xaxis=dict(gridcolor=grid_color, linecolor=grid_color, zeroline=False),
+                yaxis=dict(gridcolor=grid_color, linecolor=grid_color, zeroline=False)
             )
 
             if remove_gaps:
-                # Filter out non-TRADING days more reliably for various intervals
-                if interval in ["1d", "1wk", "1mo", "3mo"]: # For daily and longer, Sat/Sun are the primary gaps
-                     fig.update_xaxes(rangebreaks=[dict(bounds=["sat", "mon"])])
-                elif 'm' in interval or 'h' in interval: # For intraday, also consider typical market non-TRADING times
-                    # This is complex as it depends on the exchange.
-                    # A general approach is to remove weekends. More specific non-TRADING hours are harder.
-                    fig.update_xaxes(rangebreaks=[
-                        dict(bounds=["sat", "mon"]), # Weekends
-                        # dict(pattern="hour", bounds=[16, 9.5]) # Example for US market, but timezone sensitive
-                    ])
+                if interval in ["1d", "1wk", "1mo", "3mo"]:
+                    fig.update_xaxes(rangebreaks=[dict(bounds=["sat", "mon"])])
+                elif 'm' in interval or 'h' in interval:
+                    fig.update_xaxes(rangebreaks=[dict(bounds=["sat", "mon"])])
             chart_html = fig.to_html(full_html=False, include_plotlyjs='cdn')
 
-    #except Exception as e:
-     #   current_err = f"Fehler beim Generieren des Charts (Periode: {period}, Intervall: {interval}): {str(e)}"
-      #  if "No data found for this date range" in str(e) or "yfinance failed to decrypt Yahoo data" in str(e):
-       #     current_err = f"Keine Daten für '{ticker_symbol}' im Zeitraum '{period}' mit Intervall '{interval}'. Kombination ungültig oder Ticker nicht verfügbar."
-        #error_msg = (error_msg + " | " if error_msg else "") + current_err
     except Exception as e:
         exception_str = str(e)
-        # Verwende den bereits ermittelten company_name oder den ticker_symbol für die Fehlermeldung
         display_ticker_name = company_name if company_name and company_name != ticker_symbol else ticker_symbol
         current_err_intro = f"Fehler beim Generieren des Charts für '{display_ticker_name}' (Periode: {period}, Intervall: {interval}): "
-
         if "HTTP Error 404" in exception_str:
             current_err = f"{current_err_intro}Daten nicht gefunden (HTTP 404). Wahrscheinlich ist diese Aktie nicht bei yfinance"
         elif "No data found for this date range" in exception_str or "yfinance failed to decrypt Yahoo data" in exception_str:
             current_err = f"{current_err_intro}Keine Daten für diese Auswahl. Die Kombination ist evtl. ungültig oder der Ticker nicht verfügbar."
-        # Spezifischerer Check für "pattern not found" was auf ein Problem mit dem Ticker hindeuten kann
-        elif "pattern_forms:" in exception_str and "No pattern found for" in exception_str:  # Bsp: "pattern_forms: No pattern found for stock OQFT.LON"
+        elif "pattern_forms:" in exception_str and "No pattern found for" in exception_str:
             current_err = f"{current_err_intro}Das Tickersymbol '{ticker_symbol}' scheint ungültig oder nicht unterstützt zu sein."
         else:
-            current_err = f"{current_err_intro}{exception_str}"  # Original-Fallback
-
+            current_err = f"{current_err_intro}{exception_str}"
         error_msg = (error_msg + " | " if error_msg and error_msg not in current_err else "") + current_err
 
     return chart_html, error_msg, company_name
@@ -582,95 +574,60 @@ def yfinance_ticker_is_valid(ticker_symbol: str) -> bool:
         return False
 
 def create_portfolio_graph(history_data: list[dict], dark_mode: bool = False, line_strength:int=4) -> str | None:
-        """
-        Erstellt einen HTML-Graphen des Net-Worth-Verlaufs mit prozentualer Zweitachse
-        und dynamischer Farbgebung.
-        """
-        if not history_data or len(history_data) < 2:
-            return None
+    if not history_data or len(history_data) < 2:
+        return None
 
-        # --- Daten extrahieren und vorbereiten ---
-        dates = [datetime.fromisoformat(item['date']) for item in history_data]
-        net_worths = [item['net_worth'] for item in history_data]
+    dates = [datetime.fromisoformat(item['date']) for item in history_data]
+    net_worths = [item['net_worth'] for item in history_data]
+    start_worth = net_worths[0]
+    end_worth = net_worths[-1]
+    percent_changes = [((val / start_worth) - 1) * 100 for val in net_worths]
+    is_gain = end_worth >= start_worth
+    bg_color = 'rgba(0,0,0,0)'
 
-        start_worth = net_worths[0]
-        end_worth = net_worths[-1]
+    if dark_mode:
+        font_color = '#D3D3D3'
+        line_color = '#00C805' if is_gain else '#FF4136'
+        grid_color = 'rgba(255, 255, 255, 0.1)'
+    else:
+        font_color = '#444'
+        line_color = '#198754' if is_gain else '#dc3545'
+        grid_color = 'rgba(230, 230, 230, 0.7)'
 
-        # Prozentuale Veränderung für die zweite Y-Achse berechnen
-        percent_changes = [((val / start_worth) - 1) * 100 for val in net_worths]
+    fig = go.Figure()
+    fig.add_trace(go.Scatter(
+        x=dates, y=net_worths, mode='lines',
+        line=dict(color=line_color, width=line_strength),
+        hoverinfo='y+x', name='Depotwert'
+    ))
+    fig.add_trace(go.Scatter(
+        x=dates, y=percent_changes, yaxis='y2',
+        visible=False, hoverinfo='none'
+    ))
 
-        # --- Stil-Variablen definieren ---
-        is_gain = end_worth >= start_worth
-
-        if dark_mode:
-            bg_color = '#121212'
-            font_color = '#D3D3D3'
-            # Lebhafte Farben für Dark Mode
-            line_color = '#00C805' if is_gain else '#FF4136'
-            grid_color = 'rgba(0,0,0,0)'
-        else:  # Light Mode
-            bg_color = 'rgba(0,0,0,0)'
-            font_color = '#444'
-            # Standard-Farben für Light Mode
-            line_color = '#198754' if is_gain else '#dc3545'
-            grid_color = 'rgba(230, 230, 230, 0.7)'
-
-        # --- Graph erstellen ---
-        fig = go.Figure()
-
-        # 1. Haupt-Trace für den Depotwert (jetzt dicker und farbdynamisch)
-        fig.add_trace(go.Scatter(
-            x=dates,
-            y=net_worths,
-            mode='lines',
-            line=dict(color=line_color, width=line_strength),
-            hoverinfo='y+x',
-            name='Depotwert'
-        ))
-
-        # 2. Unsichtbarer Trace für die zweite Y-Achse (Prozentwerte)
-        fig.add_trace(go.Scatter(
-            x=dates,
-            y=percent_changes,
-            yaxis='y2',  # Weist diesen Trace der zweiten Y-Achse zu
-            visible=False,  # Macht die Linie selbst unsichtbar
-            hoverinfo='none'
-        ))
-
-        # --- Layout anpassen ---
-        fig.update_layout(
-            height=250,
-            margin=dict(l=50, r=45, t=5, b=20),  # Rechter Rand für %-Achse angepasst
-            paper_bgcolor=bg_color,
-            plot_bgcolor=bg_color,
-            font=dict(color=font_color),
-            showlegend=False,
-            xaxis=dict(
-                showgrid=False,
-                tickvals=[dates[0], dates[-1]],
-                ticktext=[dates[0].strftime('%d. %b'), dates[-1].strftime('%d. %b')],
-                zeroline=False
-            ),
-            # Konfiguration der primären Y-Achse (links)
-            yaxis=dict(
-                title='',
-                tickprefix='€',
-                gridcolor=grid_color,
-                zeroline=False
-            ),
-            # Konfiguration der sekundären Y-Achse (rechts)
-            yaxis2=dict(
-                title="",
-                overlaying='y',  # Überlagert die primäre Y-Achse
-                side='right',  # Positioniert sie rechts
-                showgrid=False,  # Kein Gitter von dieser Achse
-                ticksuffix='%',  # Fügt '%' an die Ticks an
-                tickfont=dict(color=font_color),  # Passt Schriftfarbe an Modus an
-                zeroline=False,
-            )
+    fig.update_layout(
+        height=250,
+        margin=dict(l=50, r=45, t=5, b=20),
+        paper_bgcolor=bg_color,
+        plot_bgcolor=bg_color,
+        font=dict(color=font_color),
+        showlegend=False,
+        xaxis=dict(
+            showgrid=False,
+            tickvals=[dates[0], dates[-1]],
+            ticktext=[dates[0].strftime('%d. %b'), dates[-1].strftime('%d. %b')],
+            zeroline=False
+        ),
+        yaxis=dict(
+            title='', tickprefix='€', gridcolor=grid_color, zeroline=False
+        ),
+        yaxis2=dict(
+            title="", overlaying='y', side='right', showgrid=False,
+            ticksuffix='%', tickfont=dict(color=font_color), zeroline=False
         )
+    )
+    return fig.to_html(full_html=False, include_plotlyjs='cdn', config={'displayModeBar': False})
 
-        return fig.to_html(full_html=False, include_plotlyjs='cdn', config={'displayModeBar': False})
 
 @app.route('/', methods=['GET'])
 def landing_page():
@@ -712,8 +669,6 @@ def dashboard_page():
         depot=depot_data,
         graph_html=graph_html
     )
-
-
 
 
 @app.route('/search')
