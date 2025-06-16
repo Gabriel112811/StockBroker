@@ -12,10 +12,16 @@
         Aktueller Kurs: €{{ stock.get('regularMarketPrice', 'N/A') | round(2) if stock.get('regularMarketPrice') is not none else 'N/A' }}
     </div>
 
-    <div style="display: flex; justify-content: space-around; background-color: #f8f9fa; padding: 15px; border-radius: 8px; margin-bottom: 25px; text-align: center; flex-wrap: wrap; gap: 15px;">
+    <div class="info-summary-box" style="display: flex; justify-content: space-around; padding: 15px; border-radius: 8px; margin-bottom: 25px; text-align: center; flex-wrap: wrap; gap: 15px;">
         <div>
             <span style="display:block; font-size:0.9em; color:#6c757d;">Verfügbares Kapital</span>
             <strong style="font-size:1.2em;">€{{ "{:,.2f}".format(available_cash) if available_cash is not none else 'N/A' }}</strong>
+        </div>
+
+        <div id="purchase-cost-info" style="display: none;"
+             data-market-price="{{ stock.get('regularMarketPrice', 0) }}">
+            <span style="display:block; font-size:0.9em; color:#6c757d;">Kaufkosten</span>
+            <strong id="purchase-cost-value" style="font-size:1.2em;">-</strong>
         </div>
 
         {% if position %}
@@ -30,9 +36,7 @@
 
         {% if absolute_profit_loss is not none %}
         <div id="profit-loss-info" style="display: none;"
-             data-total-quantity="{{ position.quantity }}"
-             data-avg-price="{{ position.average_purchase_price }}"
-             data-market-price="{{ stock.get('regularMarketPrice', 0) }}">
+             data-avg-price="{{ position.average_purchase_price }}">
             <span style="display:block; font-size:0.9em; color:#6c757d;">Potenzieller G/V</span>
             <strong id="profit-loss-value" style="font-size:1.2em;">
             </strong>
@@ -85,6 +89,8 @@ document.addEventListener('DOMContentLoaded', function() {
     const limitPriceGroup = document.getElementById('limit-price-group');
     const stopPriceGroup = document.getElementById('stop-price-group');
 
+    const purchaseCostInfo = document.getElementById('purchase-cost-info');
+    const purchaseCostValue = document.getElementById('purchase-cost-value');
     const profitLossInfo = document.getElementById('profit-loss-info');
     const profitLossValue = document.getElementById('profit-loss-value');
     const avgPurchasePriceInfo = document.getElementById('avg-purchase-price-info');
@@ -99,59 +105,77 @@ document.addEventListener('DOMContentLoaded', function() {
         return `(${sign}${value.toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}%)`;
     }
 
-    function updatePLDisplay(absPL, relPL) {
-        if (!profitLossValue) return;
+    // --- Berechnungs- und Anzeigelogik ---
+    function calculateAndUpdatePL() {
+        if (!profitLossInfo) return;
+        const sellQuantity = parseFloat(quantityInput.value);
+        const avgPrice = parseFloat(profitLossInfo.dataset.avgPrice);
+        const selectedType = orderTypeSelect.value;
+        const marketPrice = parseFloat(purchaseCostInfo.dataset.marketPrice);
+
+        let sellPrice = 0;
+        if (selectedType === 'LIMIT_SELL') sellPrice = parseFloat(limitPriceInput.value);
+        else if (selectedType === 'STOP_LOSS_SELL') sellPrice = parseFloat(stopPriceInput.value);
+        else sellPrice = marketPrice;
+
+        if (isNaN(sellQuantity) || isNaN(avgPrice) || isNaN(sellPrice) || sellQuantity <= 0 || sellPrice <= 0) {
+            if (profitLossValue) profitLossValue.innerHTML = ''; return;
+        }
+
+        const relPL = (avgPrice !== 0) ? ((sellPrice - avgPrice) / avgPrice) * 100 : 0;
+        const absPL = (sellPrice - avgPrice) * sellQuantity;
+
         profitLossValue.style.color = absPL >= 0 ? '#198754' : '#dc3545';
         profitLossValue.innerHTML = `${formatCurrency(absPL)} <span style="font-size:0.8em; display:block;">${formatPercentage(relPL)}</span>`;
     }
 
-    // --- Hauptlogik ---
-    function calculateAndUpdatePL() {
-        if (!profitLossInfo) return;
-
-        const sellQuantity = parseFloat(quantityInput.value);
-        const avgPrice = parseFloat(profitLossInfo.dataset.avgPrice);
+    function calculateAndUpdatePurchaseCost() {
+        if (!purchaseCostInfo) return;
+        const quantity = parseFloat(quantityInput.value);
         const selectedType = orderTypeSelect.value;
+        const marketPrice = parseFloat(purchaseCostInfo.dataset.marketPrice);
 
-        let sellPrice = 0;
-        if (selectedType === 'LIMIT_SELL') {
-            sellPrice = parseFloat(limitPriceInput.value);
-        } else if (selectedType === 'STOP_LOSS_SELL') {
-            sellPrice = parseFloat(stopPriceInput.value);
-        } else { // MARKET_SELL
-            sellPrice = parseFloat(profitLossInfo.dataset.marketPrice);
+        let price = 0;
+        if (selectedType === 'LIMIT_BUY') price = parseFloat(limitPriceInput.value);
+        else if (selectedType === 'MARKET_BUY') price = marketPrice;
+
+        if (isNaN(quantity) || isNaN(price) || quantity <= 0 || price <= 0) {
+            purchaseCostValue.textContent = '-'; return;
         }
 
-        if (isNaN(sellQuantity) || isNaN(avgPrice) || isNaN(sellPrice) || sellQuantity <= 0 || sellPrice <= 0) {
-            profitLossValue.innerHTML = ''; // Feld leeren bei ungültiger Eingabe
-            return;
-        }
-
-        const purchaseValuePerShare = avgPrice;
-        const sellValuePerShare = sellPrice;
-
-        // Relativer G/V ist unabhängig von der Menge
-        const relPL = (purchaseValuePerShare !== 0) ? ((sellValuePerShare - purchaseValuePerShare) / purchaseValuePerShare) * 100 : 0;
-
-        // Absoluter G/V hängt von der Menge ab
-        const absPL = (sellValuePerShare - purchaseValuePerShare) * sellQuantity;
-
-        updatePLDisplay(absPL, relPL);
+        const totalCost = quantity * price;
+        purchaseCostValue.textContent = formatCurrency(totalCost);
     }
 
     function toggleDynamicElements() {
         const selectedType = orderTypeSelect.value;
 
-        // Standardmäßig alles ausblenden
+        // Reset state
         limitPriceGroup.style.display = 'none';
         limitPriceInput.required = false;
         stopPriceGroup.style.display = 'none';
         stopPriceInput.required = false;
-
+        if (purchaseCostInfo) purchaseCostInfo.style.display = 'none';
         if (profitLossInfo) profitLossInfo.style.display = 'none';
         if (avgPurchasePriceInfo) avgPurchasePriceInfo.style.display = 'none';
 
-        // Gezielt einblenden
+        // Show elements based on selection
+        const buyTypes = ['MARKET_BUY', 'LIMIT_BUY'];
+        const sellTypes = ['MARKET_SELL', 'LIMIT_SELL', 'STOP_LOSS_SELL'];
+
+        if (buyTypes.includes(selectedType)) {
+            if (purchaseCostInfo) purchaseCostInfo.style.display = 'initial';
+            calculateAndUpdatePurchaseCost();
+        }
+
+        if (sellTypes.includes(selectedType)) {
+            if (profitLossInfo) profitLossInfo.style.display = 'initial';
+            if (avgPurchasePriceInfo && (selectedType === 'LIMIT_SELL' || selectedType === 'STOP_LOSS_SELL')) {
+                avgPurchasePriceInfo.style.display = 'initial';
+            }
+            calculateAndUpdatePL();
+        }
+
         if (selectedType === 'LIMIT_BUY' || selectedType === 'LIMIT_SELL') {
             limitPriceGroup.style.display = 'block';
             limitPriceInput.required = true;
@@ -161,26 +185,14 @@ document.addEventListener('DOMContentLoaded', function() {
             stopPriceGroup.style.display = 'block';
             stopPriceInput.required = true;
         }
-
-        const sellTypes = ['MARKET_SELL', 'LIMIT_SELL', 'STOP_LOSS_SELL'];
-        if (profitLossInfo && sellTypes.includes(selectedType)) {
-            profitLossInfo.style.display = 'initial';
-            if (avgPurchasePriceInfo && (selectedType === 'LIMIT_SELL' || selectedType === 'STOP_LOSS_SELL')) {
-                avgPurchasePriceInfo.style.display = 'initial';
-            }
-            calculateAndUpdatePL();
-        } else {
-            if(profitLossValue) profitLossValue.innerHTML = '';
-        }
     }
 
     // --- Event-Listener ---
     orderTypeSelect.addEventListener('change', toggleDynamicElements);
-    quantityInput.addEventListener('input', calculateAndUpdatePL);
-    limitPriceInput.addEventListener('input', calculateAndUpdatePL);
+    quantityInput.addEventListener('input', () => { calculateAndUpdatePL(); calculateAndUpdatePurchaseCost(); });
+    limitPriceInput.addEventListener('input', () => { calculateAndUpdatePL(); calculateAndUpdatePurchaseCost(); });
     stopPriceInput.addEventListener('input', calculateAndUpdatePL);
 
-    // Initialer Aufruf, um den korrekten Zustand beim Laden der Seite herzustellen
     toggleDynamicElements();
 });
 </script>

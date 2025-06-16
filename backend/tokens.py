@@ -1,4 +1,3 @@
-# token_system.py
 import sqlite3
 import hashlib
 import secrets
@@ -10,77 +9,62 @@ class TokenEndpoint:
     Verwaltet die Erstellung und Verifizierung von sicheren, kurzlebigen Tokens.
     """
 
-
-
     @staticmethod
     def generate_email_token(conn: sqlite3.Connection, user_id: int) -> str:
-        """Erzeugt einen E-Mail-Verifizierung-Token (1 Tag gültig)."""
-        return _generate_and_store_token(conn, user_id, 'EMAIL_VERIFICATION', lifespan_seconds=86400)
+        """Erzeugt einen E-Mail-Verifizierung-Token (10 Minuten gültig)."""
+        return _generate_and_store_token(conn, user_id, 'EMAIL_VERIFICATION', lifespan_seconds=600)
 
     @staticmethod
     def generate_password_token(conn: sqlite3.Connection, user_id: int) -> str:
-        """Erzeugt einen Passwort-Reset-Token (1 Stunde gültig)."""
-        return _generate_and_store_token(conn, user_id, 'PASSWORD_RESET', lifespan_seconds=3600)
-
-    @staticmethod
-    def generate_admin_token(conn: sqlite3.Connection, user_id: int) -> str:
-        """Erzeugt einen Admin-Token (8 Stunden gültig)."""
-        return _generate_and_store_token(conn, user_id, 'ADMIN_ACCESS', lifespan_seconds=28800)
+        """Erzeugt einen Passwort-Reset-Token (10 Minuten gültig)."""
+        # Passend zur E-Mail Vorlage auf 10 Minuten (600 Sekunden) gesetzt
+        return _generate_and_store_token(conn, user_id, 'PASSWORD_RESET', lifespan_seconds=600)
 
     @staticmethod
     def generate_instant_register_token(conn: sqlite3.Connection) -> str:
-        """Erzeugt einen Registrierungs-Token (7 Tage gültig), nicht an einen User gebunden."""
-        return _generate_and_store_token(conn, None, 'INSTANT_REGISTER', lifespan_seconds=604800)
-
-    # --- Öffentliche Verify-Methoden ---
+        """Erzeugt einen Registrierungs-Token (1 Jahr gültig), nicht an einen User gebunden."""
+        return _generate_and_store_token(conn, None, 'INSTANT_REGISTER', lifespan_seconds=365*24*3600)
 
     @staticmethod
-    def verify_email_token(conn: sqlite3.Connection, token: str) -> bool:
-        """Verifiziert einen E-Mail-Token."""
-        user_id = _verify_and_consume_token(conn, token, 'EMAIL_VERIFICATION')
-        return user_id is not None
+    def verify_email_token(conn: sqlite3.Connection, token: str) -> int | None:
+        """
+        Verifiziert einen E-Mail-Token und gibt bei Erfolg die user_id zurück.
+        """
+        return _verify_and_consume_token(conn, token, 'EMAIL_VERIFICATION')
 
     @staticmethod
-    def verify_password_token(conn: sqlite3.Connection, token: str) -> bool:
-        """Verifiziert einen Passwort-Reset-Token."""
+    def verify_password_token(conn: sqlite3.Connection, token: str) -> dict | None:
+        """
+        Verifiziert einen Passwort-Reset-Token und gibt bei Erfolg die user_id zurück.
+        """
         user_id = _verify_and_consume_token(conn, token, 'PASSWORD_RESET')
-        return user_id is not None
-
-    @staticmethod
-    def verify_admin_token(conn: sqlite3.Connection, token: str) -> bool:
-        """Verifiziert einen Admin-Token."""
-        user_id = _verify_and_consume_token(conn, token, 'ADMIN_ACCESS')
-        return user_id is not None
+        if user_id:
+             return {"success": True, "user_id": user_id, "message": "Token valide"}
+        return {"success": False, "message": "Token ungültig oder abgelaufen"}
 
     @staticmethod
     def verify_instant_register_token(conn: sqlite3.Connection, token: str) -> bool:
-        """Verifiziert einen Registrierungs-Token."""
-        # Hier ist die user_id bei Erfolg None, da sie nicht existiert.
-        # Der Rückgabewert der internen Funktion (None bei Erfolg) wird korrekt zu True.
-        result = _verify_and_consume_token(conn, token, 'INSTANT_REGISTER')
-        # Der Aufruf war erfolgreich, wenn ein Token gefunden und konsumiert wurde.
-        # Im Erfolgsfall gibt _verify_and_consume_token die user_id zurück (hier: None)
-        # Wir brauchen eine Prüfung, die auf den erfolgreichen Fund reagiert.
-        # Eine kleine Anpassung: _verify_and_consume_token gibt bei Erfolg immer die user_id oder 'SUCCESS_NO_USER' zurück.
-        # Hier vereinfacht: Wenn die Funktion durchläuft ohne Fehler, war es valide.
-        # Die Logik ist hier leicht anders: der Aufruf an sich ist der Check.
-        # Ein Hack wäre `return result is None`, aber das ist unsauber.
-        # Saubere Lösung: `_verify_and_consume_token` muss klar signalisieren "gefunden und konsumiert".
-        # Für jetzt belassen wir die Logik so, dass `is not None` auf eine User ID prüft, was für diesen Fall nicht passt.
-
-        # Korrigierte Logik für diesen speziellen Fall:
+        """
+        Verifiziert und konsumiert einen Registrierungs-Token. Gibt True bei Erfolg zurück.
+        """
+        # Diese Methode ist speziell, da sie keinen User zurückgibt.
+        # Sie gibt einfach an, ob der Token gültig war und konsumiert wurde.
         hashed_token = _hash_token(token)
         cursor = conn.cursor()
-        cursor.execute(
-            "SELECT id FROM secure_tokens WHERE token_hash = ? AND token_type = 'INSTANT_REGISTER' AND expires_at > ?",
-            (hashed_token, datetime.now()))
+        find_sql = "SELECT id FROM secure_tokens WHERE token_hash = ? AND token_type = 'INSTANT_REGISTER' AND expires_at > ?"
+        cursor.execute(find_sql, (hashed_token, datetime.now().strftime('%Y-%m-%d %H:%M:%S')))
         result = cursor.fetchone()
+
         if result:
-            cursor.execute("DELETE FROM secure_tokens WHERE id = ?", (result[0],))
-            return True
-        return False
-    
-    
+            token_id = result[0]
+            cursor.execute("DELETE FROM secure_tokens WHERE id = ?", (token_id,))
+            return True # Token war valide und wurde konsumiert
+        return False # Token nicht gefunden oder abgelaufen
+
+    @staticmethod
+    def remove_expired_tokens():
+        pass
+
 
 def _generate_token(length: int = 32) -> str:
     """Erzeugt einen kryptografisch sicheren, URL-freundlichen Token."""
@@ -95,7 +79,8 @@ def _generate_and_store_token(conn: sqlite3.Connection, user_id: int | None, tok
     """
     Interne Kernfunktion: Erzeugt Token, speichert Hash und gibt rohen Token zurück.
     """
-    raw_token = _generate_token()
+    length = 8 if lifespan_seconds <= 1000 else 20
+    raw_token = _generate_token(length=length)
     hashed_token = _hash_token(raw_token)
 
     now = datetime.now()
@@ -110,6 +95,7 @@ def _generate_and_store_token(conn: sqlite3.Connection, user_id: int | None, tok
 
     # Der rohe Token wird nur einmal zurückgegeben und niemals gespeichert!
     return raw_token
+
 
 def _verify_and_consume_token(conn: sqlite3.Connection, raw_token: str, expected_type: str) -> int | None:
     """

@@ -77,29 +77,54 @@ class TradingEndpoint:
             else:
                 cursor.execute("DELETE FROM stock_depot WHERE user_id_fk = ? AND ticker = ?", (user_id, ticker))
 
-    # Die Methoden _execute_market_trade, place_order, get_user_orders, cancel_order bleiben unverändert
     @staticmethod
     def _execute_market_trade(conn: sqlite3.Connection, user_id: int, ticker: str, quantity: int, is_buy: bool) -> dict:
-        # ... (keine Änderungen)
+        """
+        Führt einen Market-Trade aus, aktualisiert Kontostand sowie Depot
+        und protokolliert den Trade in der 'orders'-Tabelle.
+        """
         price = TradingEndpoint._get_current_price(ticker)
         if not price:
             return {"success": False, "message": f"Konnte aktuellen Preis für {ticker} nicht abrufen."}
+
         total_cost = price * quantity
         username = UTILITIES.get_username(conn, user_id)
+        order_type = 'MARKET_BUY' if is_buy else 'MARKET_SELL'
+        now_str = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+
+        # Transaktionslogik
         if is_buy:
             current_balance = AccountEndpoint.get_balance(conn, user_id=user_id)
             if current_balance is None or current_balance < total_cost:
                 return {"success": False, "message": "Nicht genügend Guthaben für diesen Kauf."}
             AccountEndpoint.update_balance(conn, username, -total_cost)
             TradingEndpoint._update_depot(conn, user_id, ticker, quantity, price, is_buy=True)
-            return {"success": True, "message": f"{quantity} {ticker} für {price:.2f} € pro Aktie gekauft."}
-        else:
+            message = f"{quantity} {ticker} für {price:.2f} € pro Aktie gekauft."
+        else:  # is_sell
             try:
                 TradingEndpoint._update_depot(conn, user_id, ticker, quantity, price, is_buy=False)
                 AccountEndpoint.update_balance(conn, username, total_cost)
-                return {"success": True, "message": f"{quantity} {ticker} für {price:.2f} € pro Aktie verkauft."}
+                message = f"{quantity} {ticker} für {price:.2f} € pro Aktie verkauft."
             except ValueError as e:
                 return {"success": False, "message": str(e)}
+
+        # NEU: Protokollierung des ausgeführten Trades in der 'orders'-Tabelle
+        try:
+            sql_log_order = """
+                    INSERT INTO orders 
+                    (user_id_fk, ticker, order_type, quantity, status, created_at, executed_at, executed_price)
+                    VALUES (?, ?, ?, ?, 'EXECUTED', ?, ?, ?)
+                """
+            params = (user_id, ticker, order_type, quantity, now_str, now_str, price)
+            cursor = conn.cursor()
+            cursor.execute(sql_log_order, params)
+            print(f"Market-Trade für User {user_id} ({ticker}) erfolgreich in 'orders' protokolliert.")
+        except sqlite3.Error as e:
+            # Wenn die Protokollierung fehlschlägt, ist der Trade trotzdem durch.
+            # Wir geben eine Warnung aus, machen aber keinen Rollback der Finanztransaktion.
+            print(f"WARNUNG: Finanztransaktion erfolgreich, aber Protokollierung in 'orders' fehlgeschlagen: {e}")
+
+        return {"success": True, "message": message}
 
     @staticmethod
     def place_order(conn: sqlite3.Connection, user_id: int, order_details: dict) -> dict:

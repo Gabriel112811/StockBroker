@@ -1,32 +1,97 @@
 {% extends "base.html" %}
 
-{% block title %}Konto erstellen{% endblock %}
+{% block title %}Registrieren{% endblock %}
 
 {% block content %}
 <div class="auth-container">
-    <h1>Konto erstellen</h1>
+    <h1>Neuen Account erstellen</h1>
     <form method="POST" action="{{ url_for('register_page') }}">
+
         <div class="form-group">
-            <label for="username">öffentlicher Benutzername</label>
-            {# Benutze form_data, um den Wert bei Fehler wieder einzusetzen #}
-            <input type="text" id="username" name="username" value="{{ form_data.username if form_data and form_data.username else '' }}" required>
+            <label for="username">Benutzername</label>
+            <input type="text" id="username" name="username" class="form-control" required minlength="3">
+            <div id="username-availability-feedback" style="font-size: 0.9em; margin-top: 5px; height: 1em;"></div>
         </div>
+
         <div class="form-group">
-            <label for="email">E-Mail-Adresse</label>
-            <input type="email" id="email" name="email" value="{{ form_data.email if form_data and form_data.email else '' }}" required>
+            <label for="email">E-Mail für Bestätigungscodes</label>
+            <input type="email" id="email" name="email" class="form-control" required>
         </div>
+
         <div class="form-group">
-            <label for="password">Passwort (min. 6 Zeichen)</label>
-            <input type="password" id="password" name="password" required>
+            <label for="password">6 Zeichen Passwort</label>
+            <input type="password" id="password" name="password" class="form-control" required>
         </div>
+
         <div class="form-group">
             <label for="password_confirm">Passwort bestätigen</label>
-            <input type="password" id="password_confirm" name="password_confirm" required>
+            <input type="password" id="password_confirm" name="password_confirm" class="form-control" required>
         </div>
-        <button type="submit" class="form-button">Registrieren</button>
+
+        <button type="submit" class="form-button full-width">Registrieren</button>
     </form>
     <div class="links">
-        <a href="{{ url_for('login_page') }}">Bereits ein Konto? Einloggen</a>
+        <p>Schon einen Account? <a href="{{ url_for('login_page') }}">Hier einloggen</a></p>
     </div>
 </div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+
+    // --- Username Validierung (MIT Verzögerung) ---
+    let usernameTimeout;
+    const usernameInput = document.getElementById('username');
+    const feedbackEl = document.getElementById('username-availability-feedback');
+
+    if (usernameInput) {
+        usernameInput.addEventListener('input', () => {
+            clearTimeout(usernameTimeout);
+            feedbackEl.textContent = 'Prüfe...';
+            feedbackEl.style.color = '#6c757d';
+
+            usernameTimeout = setTimeout(() => {
+                const username = usernameInput.value.trim();
+                if (username.length === 0) {
+                    feedbackEl.textContent = '';
+                    return;
+                }
+
+                fetch(`/check_username?name=${encodeURIComponent(username)}`)
+                    .then(response => {
+                        if (!response.ok) {
+                            throw new Error('Netzwerkfehler bei der Anfrage.');
+                        }
+                        return response.json();
+                    })
+                    .then(data => {
+                        feedbackEl.textContent = data.message;
+                        feedbackEl.style.color = data.success ? 'green' : 'red';
+                    })
+                    .catch(error => {
+                        console.error('Fehler bei der Benutzernamen-Validierung:', error);
+                        feedbackEl.textContent = 'Prüfung fehlgeschlagen.';
+                        feedbackEl.style.color = 'red';
+                    });
+            }, 800); // 800ms Verzögerung
+        });
+    }
+
+    // --- Passwort-Validierung ---
+    function validatePassword() {
+        const password = document.getElementById('password').value;
+        const confirmPassword = document.getElementById('password_confirm').value;
+        const confirmEl = document.getElementById('password_confirm');
+
+        if (password !== confirmPassword) {
+            confirmEl.setCustomValidity("Passwörter stimmen nicht überein.");
+        } else {
+            confirmEl.setCustomValidity('');
+        }
+    }
+    document.getElementById('password').addEventListener('change', validatePassword);
+    document.getElementById('password_confirm').addEventListener('keyup', validatePassword);
+});
+</script>
 {% endblock %}

@@ -28,6 +28,13 @@
         </button>
     </div>
 
+    {% if graph_html %}
+    <div class="data-section">
+        <h2>Depot-Verlauf</h2>
+        {{ graph_html|safe }}
+    </div>
+    {% endif %}
+
     <h3>Ihre Positionen</h3>
     <table class="table table-hover" id="positions-table">
         <thead>

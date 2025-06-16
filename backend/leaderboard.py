@@ -120,7 +120,7 @@ class LeaderboardEndpoint:
 
         # Schritt 1: Alle Benutzerdaten und Portfolios aus der DB holen
         cursor = conn.cursor()
-        cursor.execute("SELECT user_id, username, money FROM all_users")
+        cursor.execute("SELECT user_id, username, money FROM all_users") # lieber Utilities aufrufen
         all_users = cursor.fetchall()
 
         cursor.execute("SELECT user_id_fk, ticker, quantity FROM stock_depot")

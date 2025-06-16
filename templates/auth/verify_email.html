@@ -1,0 +1,23 @@
+{% extends "base.html" %}
+
+{% block title %}E-Mail verifizieren{% endblock %}
+
+{% block content %}
+<div class="auth-container">
+    <h1>E-Mail verifizieren</h1>
+    <p style="text-align: center; margin-bottom: 20px; color: #6c757d;">
+        Gib den Verifizierungs-Code aus der E-Mail ein, um deinen Account zu aktivieren.
+    </p>
+    <form method="POST" action="{{ url_for('verify_email_page') }}">
+        <div class="form-group">
+            <label for="token">Verifizierungs-Code</label>
+            <input type="text" id="token" name="token" required>
+        </div>
+        <button type="submit" class="form-button">Account aktivieren</button>
+    </form>
+    <div class="links">
+        {# Hier könnte man eine Funktion "Code erneut senden" implementieren #}
+        <a href="{{ url_for('login_page') }}">Zurück zum Login</a>
+    </div>
+</div>
+{% endblock %}

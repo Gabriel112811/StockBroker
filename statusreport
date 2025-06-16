@@ -1,47 +1,13 @@
 Bgs to fix:
 3 Monate Interval ist nicht auf High verfügbar.
 Wenn man auf jetzt handeln geht, soll man nach dem anmelden auf die trading-seite redirected werden.
-wenn man sich angemeldet hat, WIRD ALS NAME NONE angezeigt.
-
-
-To dos:
-das hinzufügen:
-    in all_users soll der hash vom aktuellsten reset passwort und verify email code gespeichert werden können. Default: "".
-    Die codes müssen auch noch irgendwie ablaufen, das muss ich aber machen.
-    in all_Users soll auch das datum der letzten anmeldung sein. Wenn es "" ist, soll das bedeuten, der User hat sich noch nie angemeldet.
-
-    Leaderboard.html
-
-
 
 Z145 in app.py muss noch geguckt werden, das das result auch richtig zu user gegeben wird.
 
-Done:
-Es muss ein hinweis zur erstellung das usernames, dass dieser name public ist und andere nur den sehen werden.
-account_management ist jetzt -> accounts_to_database
-Leaderbord Datenbank erstellen
-@Fabius
-Wenn ein User das leaderboard aufruft, und eine Ruhezeit seit der letzten generierung vergangen ist,
-wird es neu generiert, über die stock_depot datenbank + das geld aus account_management
-dafür brauchen wir noch die entsprechenden python-to-sql funktionen von dir
+Bei aktualisierung des leaderboard immer wert speichern. Ein mal pro tag durchgehen: zb 200 werte behalten.
+iterativ den mit dem kürzesten timedelta löschen, bis von mehr als 200 werten auf 200 werte gekommen.
++ stündlich von letzter woche behalten.
 
+Depot mit farben machen
 
-
-Schreibe eine route für meine app.py und die entsprechende .html für das Leaderboard. der pfad zur htmk wird /templates/leaderboard.html sein.  im Momment ist es okay, wenn das leaderboard berechnet wird, wenn ein user auf /leaderboard zugreift.
-
-wenn jede letzte generierung aber weniger als 10 minuten her ist, muss nicht neu generiert werden.
-
-Integriere auch die Funktion, das nur die ersten 50 angezeigt und auch nur die ersten 50 abgefragt werden. falls es aber mehr als 50 gibt, soll es nachfolgende seiten geben.
-
-
-
-implementiere das styling aus der base.html, die ich noch schicke.
-
-
-
-schreibe außerdem das selbe für das depot. Im depot soll ganz oben der aktuelle Depot-wert inklusive sein, der aus das nicht investierte geld beinhaltet. klein daneben ein knopf zum aktualisieren, den man nur jede minute drücken kann. Am Besten wäre, wenn der Button nach dem frücken zu einer art ladeschnecke wird, die sich innerhalb der minute auffült.
-
-unter dem großen wert sollen dann die Einzelnen Positionen aufgelistet sein, davon ganz unten der kontostand, das nicht investierte Geld.
-
-
-
+emails stripen

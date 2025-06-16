@@ -69,9 +69,120 @@
 
         /* For screen readers only */
         .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0,0,0,0); border: 0; }
+
+        .search-result-item {
+            background-color: #fff;
+            border: 1px solid #e0e0e0;
+            border-radius: 6px;
+            padding: 15px;
+            margin-bottom: 15px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        /* =================================== */
+        /* ===         DARK MODE           === */
+        /* =================================== */
+        .dark-mode {
+            background-color: #0c1014;
+            color: #cdd3da;
+        }
+
+        /* --- Container & Navbar --- */
+        .dark-mode .navbar,
+        .dark-mode .content-container,
+        .dark-mode .auth-container {
+            background-color: #171c22;
+            color: #cdd3da;
+            border-color: #2a2a2a;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+        }
+
+        .dark-mode h1, .dark-mode h2 {
+            color: #ffffff;
+            border-bottom-color: #2a3b4d;
+        }
+
+        /* --- Navigation & Links --- */
+        .dark-mode .navbar nav a {
+            color: #cdd3da;
+        }
+        .dark-mode .navbar nav a:hover,
+        .dark-mode .navbar nav a.active {
+            color: #4a90e2;
+            text-decoration: none;
+        }
+        .dark-mode a {
+            color: #4a90e2;
+        }
+
+        /* --- Formulare & Eingabefelder (KORRIGIERT) --- */
+        .dark-mode .form-control,
+        .dark-mode .form-group select {
+            background-color: #2a3b4d;  /* Dunkler Hintergrund jetzt als Standard */
+            color: #e0e0e0;
+            border: 1px solid #3d4f61; /* Standard-Rand */
+        }
+        .dark-mode .form-control::placeholder {
+            color: #8a99a8;
+        }
+        .dark-mode .form-control:focus,
+        .dark-mode .form-group select:focus {
+            background-color: #3d4f61; /* Etwas hellerer Hintergrund bei Fokus */
+            border-color: #4a90e2;     /* Blauer Rand bei Fokus */
+            box-shadow: 0 0 0 0.25rem rgba(74, 144, 226, 0.2);
+        }
+
+        /* --- Tabellen --- */
+        .dark-mode .table {
+            color: #cdd3da;
+        }
+        .dark-mode .table th,
+        .dark-mode .table td {
+            border-top-color: #2a3b4d;
+        }
+        .dark-mode .table thead th {
+            border-bottom-color: #3d4f61;
+        }
+        .dark-mode .table-hover tbody tr:hover {
+            background-color: #222831;
+            color: #fff;
+        }
+        .dark-mode .table-striped tbody tr:nth-of-type(odd) {
+            background-color: #1a2026;
+        }
+
+        /* --- Spezifische Container (KORRIGIERT) --- */
+        .dark-mode .chart-container {
+            background-color: transparent;
+        }
+        .dark-mode .info-summary-box {
+            background-color: #1a2026;
+        }
+        /* NEU: Regel für Suchergebnis-Boxen */
+        .dark-mode .search-result-item {
+            background-color: #1a2026;
+            border: 1px solid #2a3b4d;
+        }
+
+        /* --- Allgemeine Texte & Info-Boxen --- */
+        .dark-mode p, .dark-mode span, .dark-mode label {
+            color: #cdd3da;
+        }
+        .dark-mode .info-box {
+            background-color: rgba(74, 144, 226, 0.1);
+            color: #a3c9f5;
+            border: 1px solid rgba(74, 144, 226, 0.2);
+        }
+        .dark-mode .search-result-item {
+            background-color: #1a2026;
+            border-color: #2a3b4d;
+        }
+
     </style>
 </head>
-<body>
+<body class="{% if g.user_settings and g.user_settings.dark_mode %}dark-mode{% endif %}">
     <header class="navbar">
         <div class="logo"><a href="{{ url_for('landing_page') }}">StockBroker</a></div>
         <nav>
@@ -82,6 +193,9 @@
                 <a href="{{ url_for('leaderboard_page') }}" class="{{ 'active' if request.endpoint == 'leaderboard_page' else '' }}">Leaderboard</a>
 
                 <a href="{{ url_for('logout') }}">Logout ({{ session.username }})</a>
+
+                <a href="{{ url_for('settings_page') }}" title="Einstellungen" style="font-size: 1.5em; text-decoration: none;">⚙️</a>
+                <a href="{{ url_for('logout') }}" title="Logout">Logout</a>
             {% else %}
                 <a href="{{ url_for('login_page') }}" class="{{ 'active' if request.endpoint == 'login_page' else '' }}">Login</a>
                 <a href="{{ url_for('register_page') }}" class="{{ 'active' if request.endpoint == 'register_page' else '' }}">Registrieren</a>

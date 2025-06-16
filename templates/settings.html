@@ -1,0 +1,144 @@
+{% extends "base.html" %}
+{% block title %}Einstellungen{% endblock %}
+
+{% block content %}
+<div class="content-container" style="max-width: 700px;">
+    <h1>Einstellungen</h1>
+
+    <div class="data-section">
+        <h2>Instagram Profil</h2>
+        {% if settings.ig_link %}
+            <p>Dein aktueller Link: <a href="{{ settings.ig_link }}" target="_blank">{{ settings.ig_link }}</a></p>
+            <form method="POST" style="display: inline;">
+                <button type="submit" name="delete_ig_link" class="form-button">Link entfernen</button>
+            </form>
+        {% else %}
+            <form method="POST">
+                <div class="form-group">
+                    <label for="ig_link">Instagram Profil-URL</label>
+                    <input type="text" id="ig_link" name="ig_link" class="form-control" placeholder="https://www.instagram.com/dein_name">
+                    <div id="ig-link-feedback" style="font-size: 0.9em; margin-top: 5px; height: 1em;"></div>
+                </div>
+                <button type="submit" name="set_ig_link" class="form-button">Speichern</button>
+            </form>
+        {% endif %}
+    </div>
+
+    <div class="data-section">
+        <h2>Darstellung</h2>
+        <form method="POST">
+            <div class="form-group" style="display: flex; align-items: center;">
+                <input type="checkbox" id="dark_mode" name="dark_mode" {% if settings.dark_mode %}checked{% endif %} onchange="this.form.submit()">
+                <label for="dark_mode" style="margin-left: 10px; margin-bottom: 0;">Dark Mode aktivieren</label>
+            </div>
+        </form>
+    </div>
+
+    <div class="data-section">
+        <h2>Benutzername ändern</h2>
+        <div id="username-display-container">
+            Dein Benutzername: <strong>{{ session.username }}</strong>
+            {% if can_change_name %}
+                <button id="edit-username-btn" style="border:none; background:none; cursor:pointer; font-size: 1em;">✏️</button>
+            {% else %}
+                <span title="Änderung erst wieder in 7 Tagen möglich">🔒</span>
+            {% endif %}
+        </div>
+        <div id="username-edit-container" style="display: none;">
+            <form method="POST" style="display: flex; align-items: center; gap: 10px;">
+                <input type="text" id="new_username" name="new_username" class="form-control" value="{{ session.username }}">
+                <button type="submit" style="border:none; background:none; cursor:pointer; font-size: 1.5em;">✔️</button>
+            </form>
+            <div id="username-availability-feedback" style="font-size: 0.9em; margin-top: 5px; height: 1em;"></div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+
+    // --- Instagram Link Validierung (OHNE Verzögerung) ---
+    const igLinkInput = document.getElementById('ig_link');
+    const igFeedbackEl = document.getElementById('ig-link-feedback');
+
+    if (igLinkInput) {
+        igLinkInput.addEventListener('input', () => {
+            const link = igLinkInput.value.trim();
+
+            if (link.length === 0) {
+                igFeedbackEl.textContent = '';
+                return; // Feld leeren, wenn Eingabe leer ist
+            }
+
+            fetch(`/check_ig_link?link=${encodeURIComponent(link)}`)
+                .then(response => {
+                    if (!response.ok) { // Prüft auf HTTP-Fehler wie 404 oder 500
+                        throw new Error('Netzwerkfehler bei der Anfrage.');
+                    }
+                    return response.json();
+                })
+                .then(data => {
+                    // Verarbeitet die JSON-Antwort vom Backend
+                    igFeedbackEl.textContent = data.message;
+                    igFeedbackEl.style.color = data.success ? 'green' : 'red';
+                })
+                .catch(error => {
+                    // Fängt Netzwerkfehler oder JSON-Parse-Fehler ab
+                    console.error('Fehler bei der Instagram-Link-Validierung:', error);
+                    igFeedbackEl.textContent = 'Prüfung fehlgeschlagen.';
+                    igFeedbackEl.style.color = 'red';
+                });
+        });
+    }
+
+    // --- Username Validierung (MIT Verzögerung) ---
+    let usernameTimeout;
+    const usernameInput = document.getElementById('new_username');
+    const usernameFeedbackEl = document.getElementById('username-availability-feedback');
+
+    if (usernameInput) {
+        usernameInput.addEventListener('input', () => {
+            clearTimeout(usernameTimeout);
+            usernameFeedbackEl.textContent = 'Prüfe...';
+            usernameFeedbackEl.style.color = '#6c757d';
+
+            usernameTimeout = setTimeout(() => {
+                const username = usernameInput.value.trim();
+                if (username.length === 0) {
+                    usernameFeedbackEl.textContent = '';
+                    return;
+                }
+
+                fetch(`/check_username?name=${encodeURIComponent(username)}`)
+                    .then(response => {
+                        if (!response.ok) {
+                            throw new Error('Netzwerkfehler bei der Anfrage.');
+                        }
+						return response.json();
+                    })
+                    .then(data => {
+                        usernameFeedbackEl.textContent = data.message;
+                        usernameFeedbackEl.style.color = data.success ? 'green' : 'red';
+                    })
+                    .catch(error => {
+                        console.error('Fehler bei der Benutzernamen-Validierung:', error);
+                        usernameFeedbackEl.textContent = 'Prüfung fehlgeschlagen.';
+                        usernameFeedbackEl.style.color = 'red';
+                    });
+            }, 800); // 800ms Verzögerung
+        });
+    }
+
+    // --- Edit-Button für Username ---
+    const editBtn = document.getElementById('edit-username-btn');
+    if (editBtn) {
+        editBtn.addEventListener('click', () => {
+            document.getElementById('username-display-container').style.display = 'none';
+            document.getElementById('username-edit-container').style.display = 'block';
+        });
+    }
+});
+</script>
+{% endblock %}

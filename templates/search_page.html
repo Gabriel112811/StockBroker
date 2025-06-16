@@ -24,11 +24,14 @@
         <h2>Suchergebnisse für "{{ query }}"</h2>
         <ul style="list-style: none; padding: 0;">
             {% for result in results %}
-                <li style="background-color: #fff; border: 1px solid #e0e0e0; border-radius: 6px; padding: 15px; margin-bottom: 15px; display: flex; justify-content: space-between; align-items: center;">
+                {# === KORRIGIERTE ZEILE === #}
+                {# Inline-Stil wurde entfernt und durch die Klasse ersetzt #}
+                <li class="search-result-item">
+                {# ======================= #}
                     <div>
                         <h3 style="margin:0 0 5px 0; font-size: 1.2em;">
                             {% if result.yfinance_valid %}
-                                <a href="{{ url_for('stock_detail_page', ticker_symbol=result['1. symbol']) }}" style="text-decoration:none; color:#0d6efd;">
+                                <a href="{{ url_for('stock_detail_page', ticker_symbol=result['1. symbol']) }}" style="text-decoration:none;">
                                     {{ result['2. name'] }} ({{ result['1. symbol'] }})
                                 </a>
                             {% else %}

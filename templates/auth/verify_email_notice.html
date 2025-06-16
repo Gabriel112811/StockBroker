@@ -1,0 +1,20 @@
+{% extends "base.html" %}
+
+{% block title %}Account-Aktivierung erforderlich{% endblock %}
+
+{% block content %}
+<div class="auth-container" style="text-align: center;">
+    <h1>Fast geschafft!</h1>
+    <p style="margin-bottom: 25px; font-size: 1.1em;">
+        Wir haben eine E-Mail zur Aktivierung deines Accounts an deine angegebene Adresse gesendet.
+    </p>
+    <p style="color: #6c757d;">
+        Bitte klicke auf den Link in der E-Mail oder gib den enthaltenen Code ein, um die Registrierung abzuschließen.
+        Der Code ist 24 Stunden gültig.
+    </p>
+    <div class="links" style="margin-top: 30px;">
+        <a href="{{ url_for('verify_email_page') }}">Code manuell eingeben</a>
+        <a href="{{ url_for('login_page') }}">Zurück zum Login</a>
+    </div>
+</div>
+{% endblock %}

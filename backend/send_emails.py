@@ -5,19 +5,24 @@ from email.mime.multipart import MIMEMultipart
 from email.header import Header
 from jinja2 import Environment, FileSystemLoader
 
+import json
+
+path = "keys.json" if os.path.exists("keys.json") else "backend/keys.json"
+with open(path, 'r') as f:
+    daten = json.load(f)
+    SENDER_EMAIL, SENDER_PASSWORD = daten['address'], daten['gmail_app_password']
+
 # Konfiguration - Sichere Speicherung von Zugangsdaten!
 # Verwende Umgebungsvariablen oder eine Konfigurationsdatei anstelle von Hardcoding.
 SMTP_SERVER = "smtp.gmail.com"
 SMTP_PORT = 587  # Für TLS
-SENDER_EMAIL = os.environ.get("GMAIL_USER")  # Deine Gmail-Adresse
-SENDER_PASSWORD = os.environ.get("GMAIL_APP_PASSWORD")  # Dein generiertes App-Passwort
 EMAIL_TEMPLATES_DIR = os.path.join(os.path.dirname(__file__), '..', 'templates', 'emails')
 
 # Jinja2-Umgebung einrichten
 env = Environment(loader=FileSystemLoader(EMAIL_TEMPLATES_DIR))
 
 
-def _send_email(receiver_email: str, subject: str, html_content: str, text_content: str = None):
+def _send_email(receiver_email: str, subject: str, html_content: str, text_content: str = None) -> bool:
     """
     Interne Funktion zum Versenden einer E-Mail.
     """
@@ -48,7 +53,7 @@ def _send_email(receiver_email: str, subject: str, html_content: str, text_conte
     try:
         with smtplib.SMTP(SMTP_SERVER, SMTP_PORT) as server:
             server.starttls()  # TLS-Verschlüsselung aktivieren
-            server.login("rick.dercastle@gmail.com", "gpdq wslc uxjd nccw") #SENDER_EMAIL, SENDER_PASSWORD
+            server.login(SENDER_EMAIL, SENDER_PASSWORD)
             server.sendmail(SENDER_EMAIL, receiver_email, message.as_string())
         print(f"E-Mail erfolgreich an {receiver_email} gesendet.")
         return True
@@ -61,7 +66,7 @@ def _send_email(receiver_email: str, subject: str, html_content: str, text_conte
 
 
 def send_welcome_email(recipient_email: str, user_name: str, activation_token: str,
-                       base_url: str = "https://deineapp.com/activate"):
+                       base_url: str = "https://deineapp.com/activate") -> bool:
     """
     Versendet eine Willkommens-E-Mail.
     """
@@ -86,7 +91,7 @@ Dein Team
     return _send_email(recipient_email, subject, html_content, text_content)
 
 
-def send_confirmation_email(recipient_email: str, user_name: str, confirmation_code: str):
+def send_confirmation_email(recipient_email: str, user_name: str, confirmation_code: str) -> bool:
     """
     Versendet eine E-Mail zur Bestätigung der E-Mail-Adresse mit einem Code.
     """
@@ -131,17 +136,6 @@ Dein Team
 # --- Beispielaufrufe (zum Testen) ---
 if __name__ == "__main__":
     import os
-
-    os.environ["GMAIL_USER"] = "rick.dercastle@gmail.com"
-    os.environ["GMAIL_APP_PASSWORD"] = "yyjwsvorwyctvsmv"
-    SENDER_EMAIL = "rick.dercastle@gmail.com"
-    SENDER_PASSWORD = "yyjwsvorwyctvsmv"
-    # WICHTIG: Setze zuerst die Umgebungsvariablen:
-    # export GMAIL_USER="deine.email@gmail.com"
-    # export GMAIL_APP_PASSWORD="deinapppasswort"
-    #
-    # Für html2text (Fallback, falls kein expliziter Text-Content):
-    # pip install html2text
 
     test_recipient = "fanvielerdinge@gmail.com"  # Ersetze dies durch eine echte Test-E-Mail-Adresse
 

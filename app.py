@@ -14,9 +14,12 @@ from apscheduler.schedulers.background import BackgroundScheduler
 
 # Lokale Imports
 from backend.accounts_to_database import ENDPOINT as AccountEndpoint
+from backend.accounts_to_database import UTILITIES
 from backend.trading import TradingEndpoint # Geänderter Import
 from backend.leaderboard import LeaderboardEndpoint
 from backend.depot_system import DepotEndpoint
+from backend.tokens import TokenEndpoint
+from backend.accounts_to_database import Settings
 
 app = Flask(__name__)
 app.secret_key = os.urandom(24)
@@ -32,12 +35,21 @@ def get_db():
         db = g._database = sqlite3.connect(DATABASE_FILE)
     return db
 
+
 @app.teardown_appcontext
 def close_connection(exception):
     """Schließt die Datenbankverbindung am Ende des Requests."""
     db = getattr(g, '_database', None)
     if db is not None:
         db.close()
+
+@app.before_request
+def load_user_settings():
+    """Lädt die Benutzereinstellungen vor jeder Anfrage, wenn der Benutzer eingeloggt ist."""
+    g.user_settings = None
+    if 'user_id' in session:
+        conn = get_db()
+        g.user_settings = Settings.get_settings(conn, session['user_id'])
 
 # --- Decorator ---
 def login_required(f):
@@ -108,32 +120,31 @@ def scheduled_leaderboard_processing_job():
         except Exception as e:
             print(f"[Scheduler] Fehler im Job 'leaderboard_processing_job': {e}")
 
-@app.cli.command("init-data")
-def init_app_data():
-    """Führt einmalige Initialisierungsaufgaben aus: Leaderboard aktualisieren und offene Orders verarbeiten."""
+def scheduled_daily_processing_job():
     with app.app_context():
         db = get_db()
-        print("--- Starte manuelle Daten-Aktualisierung ---")
+        try:
+            print("Starte Daily Scheduler")
+            TokenEndpoint.remove_expired_tokens()
+            db.commit()
+        except Exception as e:
+            print(f"[Scheduler] Fehler im Job 'leaderboard_processing_job': {e}")
 
-        print("Aktualisiere Leaderboard...")
-        LeaderboardEndpoint.update_all_net_worths(db)
-        print("Leaderboard aktualisiert.")
+scheduler_1_min = BackgroundScheduler(daemon=True)
+scheduler_1_min.add_job(scheduled_order_processing_job, 'interval', seconds=60)
+scheduler_1_min.start()
 
-        print("Verarbeite offene Aufträge...")
-        TradingEndpoint.process_open_orders(db)
-        print("Offene Aufträge verarbeitet.")
+scheduler_10_minuets = BackgroundScheduler(daemon=True)
+scheduler_10_minuets.add_job(scheduled_leaderboard_processing_job, 'interval', seconds=60)
+scheduler_10_minuets.start()
 
-        db.commit()
-        print("--- Daten-Aktualisierung abgeschlossen ---")
+scheduler_daily = BackgroundScheduler(daemon=True)
+scheduler_daily.add_job(scheduled_daily_processing_job, 'interval', seconds=60)
+scheduler_daily.start()
 
-
-order_scheduler = BackgroundScheduler(daemon=True)
-order_scheduler.add_job(scheduled_order_processing_job, 'interval', seconds=60)
-order_scheduler.start()
-
-leaderboard_scheduler = BackgroundScheduler(daemon=True)
-leaderboard_scheduler.add_job(scheduled_order_processing_job, 'interval', seconds=600)
-leaderboard_scheduler.start()
+scheduled_order_processing_job()
+scheduled_leaderboard_processing_job()
+scheduled_daily_processing_job()
 
 # -- Konstanten für Dropdown-Optionen beim Graph --
 AVAILABLE_PERIODS = [
@@ -186,6 +197,7 @@ def register_page():
         username = request.form.get('username', '').strip()
         password = request.form.get('password', '').strip()
         password_confirm = request.form.get('password_confirm', '').strip()
+        instant_token = request.form.get('instant_register_token', '').strip()  # NEU
 
         form_data['email'] = email
         form_data['username'] = username
@@ -196,14 +208,61 @@ def register_page():
             flash('Die Passwörter stimmen nicht überein.', 'error')
         else:
             conn = get_db()
-            result = AccountEndpoint.create_account(conn, password, email, username)
+            # NEU: instant_token wird übergeben
+            result = AccountEndpoint.create_account(conn, password, email, username,
+                                                    instant_register_token=instant_token)
+
             if result.get('success'):
                 conn.commit()
-                flash(result.get('message', 'Konto erstellt! Bitte logge dich ein.'), 'success')
+                # NEU: Prüfen, ob eine Verifizierung nötig ist
+                if result.get('email_verification_required'):
+                    # Leite auf eine Seite weiter, die den User anweist, seine E-Mails zu prüfen
+                    flash(result.get('message'), 'info')
+                    return redirect(url_for('verify_email_notice_page'))
+                else:
+                    # Account sofort aktiv
+                    flash(result.get('message'), 'success')
+                    return redirect(url_for('login_page'))
+            else:
+                flash(result.get('message', 'error'), 'error')
+
+    return render_template('auth/register.html', form_data=form_data)
+
+@app.route('/verify-notice')
+def verify_email_notice_page():
+    """Zeigt eine statische Seite, die den Nutzer anweist, seine E-Mail zu prüfen."""
+    return render_template('auth/verify_email_notice.html')
+
+@app.route('/verify-email', methods=['GET', 'POST'])
+def verify_email_page():
+    """Seite, auf der der Nutzer einen Token manuell eingeben kann."""
+    if request.method == 'POST':
+        token = request.form.get('token', '').strip()
+        if not token:
+            flash('Bitte gib den Code aus der E-Mail ein.', 'error')
+        else:
+            conn = get_db()
+            result = AccountEndpoint.verify_email_with_token(conn, token)
+            if result.get('success'):
+                conn.commit()
+                flash(result.get('message'), 'success')
                 return redirect(url_for('login_page'))
             else:
-                flash(result.get('message', 'Registrierung fehlgeschlagen.'), 'error')
-    return render_template('auth/register.html', form_data=form_data)
+                flash(result.get('message'), 'error')
+
+    return render_template('auth/verify_email.html')
+
+@app.route('/verify/<token>')
+def verify_email_from_link(token):
+    """Verarbeitet den Token direkt aus dem E-Mail-Link."""
+    conn = get_db()
+    result = AccountEndpoint.verify_email_with_token(conn, token)
+    if result.get('success'):
+        conn.commit()
+        flash(result.get('message'), 'success')
+    else:
+        flash(result.get('message'), 'error')
+    return redirect(url_for('login_page'))
 
 
 @app.route('/logout')
@@ -218,7 +277,6 @@ def logout():
 @app.route('/reset-password-request', methods=['GET', 'POST'])
 def reset_password_request_page():
     form_data = {}
-    email_sent_flag = False
     if request.method == 'POST':
         email = request.form.get('email', '').strip()
         form_data['email'] = email
@@ -226,19 +284,23 @@ def reset_password_request_page():
             flash('Bitte gib deine E-Mail-Adresse ein.', 'error')
         else:
             conn = get_db()
-            result = AccountEndpoint.request_password_reset(conn, email)
-            flash(result.get('message', 'Anweisungen gesendet, falls Konto existiert.'), 'info')
-            email_sent_flag = True
-            conn.commit()
-    return render_template('auth/reset_request.html', email_sent=email_sent_flag, form_data=form_data)
+            # Diese Funktion sendet jetzt die E-Mail
+            AccountEndpoint.request_password_reset(conn, email)
+            conn.commit()  # Wichtig, damit der Token gespeichert wird
+            flash('Wenn ein Konto mit dieser E-Mail existiert, wurde eine Anleitung gesendet.', 'info')
+            # Man leitet den User direkt zur Token-Eingabe
+            return redirect(url_for('reset_password_enter_token_page'))
+
+    return render_template('auth/reset_request.html', form_data=form_data)
 
 
 @app.route('/reset-password/<token>', methods=['GET', 'POST'])
 def reset_password_confirm_page(token):
     conn = get_db()
+    # verify_reset_token gibt jetzt ein Dictionary zurück
     token_verification = AccountEndpoint.verify_reset_token(conn, token)
     if not token_verification.get('success'):
-        conn.commit()
+        # Token ist bereits konsumiert oder ungültig, commit ist nicht nötig
         flash(token_verification.get('message', 'Ungültiger oder abgelaufener Link.'), 'error')
         return redirect(url_for('login_page'))
 
@@ -519,6 +581,97 @@ def yfinance_ticker_is_valid(ticker_symbol: str) -> bool:
         # dass der Ticker nicht gültig ist.
         return False
 
+def create_portfolio_graph(history_data: list[dict], dark_mode: bool = False, line_strength:int=4) -> str | None:
+        """
+        Erstellt einen HTML-Graphen des Net-Worth-Verlaufs mit prozentualer Zweitachse
+        und dynamischer Farbgebung.
+        """
+        if not history_data or len(history_data) < 2:
+            return None
+
+        # --- Daten extrahieren und vorbereiten ---
+        dates = [datetime.fromisoformat(item['date']) for item in history_data]
+        net_worths = [item['net_worth'] for item in history_data]
+
+        start_worth = net_worths[0]
+        end_worth = net_worths[-1]
+
+        # Prozentuale Veränderung für die zweite Y-Achse berechnen
+        percent_changes = [((val / start_worth) - 1) * 100 for val in net_worths]
+
+        # --- Stil-Variablen definieren ---
+        is_gain = end_worth >= start_worth
+
+        if dark_mode:
+            bg_color = '#121212'
+            font_color = '#D3D3D3'
+            # Lebhafte Farben für Dark Mode
+            line_color = '#00C805' if is_gain else '#FF4136'
+            grid_color = 'rgba(0,0,0,0)'
+        else:  # Light Mode
+            bg_color = 'rgba(0,0,0,0)'
+            font_color = '#444'
+            # Standard-Farben für Light Mode
+            line_color = '#198754' if is_gain else '#dc3545'
+            grid_color = 'rgba(230, 230, 230, 0.7)'
+
+        # --- Graph erstellen ---
+        fig = go.Figure()
+
+        # 1. Haupt-Trace für den Depotwert (jetzt dicker und farbdynamisch)
+        fig.add_trace(go.Scatter(
+            x=dates,
+            y=net_worths,
+            mode='lines',
+            line=dict(color=line_color, width=line_strength),
+            hoverinfo='y+x',
+            name='Depotwert'
+        ))
+
+        # 2. Unsichtbarer Trace für die zweite Y-Achse (Prozentwerte)
+        fig.add_trace(go.Scatter(
+            x=dates,
+            y=percent_changes,
+            yaxis='y2',  # Weist diesen Trace der zweiten Y-Achse zu
+            visible=False,  # Macht die Linie selbst unsichtbar
+            hoverinfo='none'
+        ))
+
+        # --- Layout anpassen ---
+        fig.update_layout(
+            height=250,
+            margin=dict(l=50, r=45, t=5, b=20),  # Rechter Rand für %-Achse angepasst
+            paper_bgcolor=bg_color,
+            plot_bgcolor=bg_color,
+            font=dict(color=font_color),
+            showlegend=False,
+            xaxis=dict(
+                showgrid=False,
+                tickvals=[dates[0], dates[-1]],
+                ticktext=[dates[0].strftime('%d. %b'), dates[-1].strftime('%d. %b')],
+                zeroline=False
+            ),
+            # Konfiguration der primären Y-Achse (links)
+            yaxis=dict(
+                title='',
+                tickprefix='€',
+                gridcolor=grid_color,
+                zeroline=False
+            ),
+            # Konfiguration der sekundären Y-Achse (rechts)
+            yaxis2=dict(
+                title="",
+                overlaying='y',  # Überlagert die primäre Y-Achse
+                side='right',  # Positioniert sie rechts
+                showgrid=False,  # Kein Gitter von dieser Achse
+                ticksuffix='%',  # Fügt '%' an die Ticks an
+                tickfont=dict(color=font_color),  # Passt Schriftfarbe an Modus an
+                zeroline=False,
+            )
+        )
+
+        return fig.to_html(full_html=False, include_plotlyjs='cdn', config={'displayModeBar': False})
+
 @app.route('/', methods=['GET'])
 def landing_page():
     # Redirect to search page instead of login if not logged in, or dashboard if logged in
@@ -526,18 +679,41 @@ def landing_page():
         return redirect(url_for('dashboard_page'))
     return redirect(url_for('search_stock_page'))
 
+
 @app.route('/dashboard')
 @login_required
 def dashboard_page():
+    conn = get_db()
     user_id = session['user_id']
-    db = get_db()
-    depot_data = DepotEndpoint.get_depot_details(db, user_id)
+
+    depot_data = DepotEndpoint.get_depot_details(conn, user_id)
 
     if depot_data is None:
         flash("Fehler: Dein Benutzerkonto konnte nicht gefunden werden.", 'error')
         return redirect(url_for('logout'))
 
-    return render_template('depot.html', depot=depot_data)
+    # Platzhalter-Daten für den Graphen
+    history_data = [
+        {"date": "2025-06-14 20:18:29", "net_worth": 50000.0},
+        {"date": "2025-06-15 20:18:29", "net_worth": 51000.0},
+        {"date": "2025-06-16 20:18:29", "net_worth": 49000.0}
+    ]
+
+    # NEU: Dark-Mode-Status aus dem globalen 'g'-Objekt holen
+    dark_mode_status = g.user_settings and g.user_settings.get('dark_mode') == 1
+
+    # Graph-HTML mit der Dark-Mode-Einstellung erstellen
+    graph_html = create_portfolio_graph(history_data, dark_mode=dark_mode_status)
+
+    # Die `conn` wird durch @app.teardown_appcontext geschlossen
+
+    return render_template(
+        'depot.html',
+        depot=depot_data,
+        graph_html=graph_html
+    )
+
+
 
 
 @app.route('/search')
@@ -680,7 +856,6 @@ def stock_detail_page(ticker_symbol):
 
 
 @app.route('/leaderboard')
-@login_required
 def leaderboard_page():
     # --- Paginierungs-Setup ---
     page = request.args.get('page', 1, type=int)
@@ -771,6 +946,85 @@ def my_orders_page():
             print(f"Fehler beim Holen der Kurse für offene Orders: {e}")
 
     return render_template('my_orders.html', open_orders=open_orders, closed_orders=closed_orders, prices=prices)
+
+
+@app.route('/settings', methods=['GET', 'POST'])
+@login_required
+def settings_page():
+    conn = get_db()
+    if request.method == 'POST':
+        # Instagram Link Logik
+        if 'set_ig_link' in request.form:
+            ig_link = request.form.get('ig_link')
+            Settings.update_instagram_link(conn, session['user_id'], ig_link)
+            flash('Instagram-Link aktualisiert!', 'success')
+        elif 'delete_ig_link' in request.form:
+            Settings.update_instagram_link(conn, session['user_id'], None)
+            flash('Instagram-Link entfernt!', 'success')
+
+        # Dark Mode Logik
+        if 'dark_mode' in request.form:
+            Settings.update_dark_mode(conn, session['user_id'], True)
+        else:
+            # Wenn die Checkbox nicht im Formular ist, wurde sie nicht angekreuzt
+            Settings.update_dark_mode(conn, session['user_id'], False)
+
+        # Username Änderungslogik
+        if 'new_username' in request.form:
+            new_username = request.form.get('new_username')
+            if AccountEndpoint.can_change_username(conn, session['user_id']):
+                result = AccountEndpoint.update_username(conn, session['user_id'], new_username)
+                if result['success']:
+                    session['username'] = new_username  # Session-Variable aktualisieren!
+                    flash(result['message'], 'success')
+                else:
+                    flash(result['message'], 'error')
+            else:
+                flash('Du kannst deinen Namen nur alle 7 Tage ändern.', 'error')
+
+        conn.commit()
+        conn.close()
+        return redirect(url_for('settings_page'))
+
+    # GET Request
+    user_settings = Settings.get_settings(conn, session['user_id'])
+    can_change_name = AccountEndpoint.can_change_username(conn, session['user_id'])
+    conn.close()
+    return render_template('settings.html', settings=user_settings, can_change_name=can_change_name)
+
+
+# Neue Route für den Live-Check des Benutzernamens
+@app.route('/check_username')
+def check_username():
+    name = request.args.get('name', '')
+    conn = get_db()
+    response_data = UTILITIES.is_username_valid(conn, name)
+    conn.close()
+    return jsonify(response_data)
+
+@app.route('/check_ig_link')
+def check_ig_link():
+    try:
+        link = request.args.get('link', '')
+        response_data = UTILITIES.is_ig_link_valid(link)
+        return jsonify(response_data)
+    except Exception as e:
+        print(e)
+        return jsonify({'success': False, 'message': str(e)})
+
+from tree import data
+
+@app.route('/tree')
+def tree_page():
+
+    page_title = data['title']
+
+    # Wir wandeln das Python-Dictionary in einen JSON-String um.
+    # Dieser String wird sicher an das Template übergeben.
+    tree_json = json.dumps(data, ensure_ascii=False)
+
+    # Wir rendern das 'decision_tree.html'-Template aus dem /templates Ordner.
+    return render_template('decision_tree.html', title=page_title, tree_json=tree_json)
 
 
 if __name__ == '__main__':
