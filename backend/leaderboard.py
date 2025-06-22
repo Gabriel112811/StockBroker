@@ -7,12 +7,16 @@ Aktienwerte werden über die yfinance-Bibliothek abgefragt.
 """
 
 import sqlite3
+import collections
 import yfinance as yf
 import pandas as pd
 from datetime import datetime
 from collections import defaultdict
 
-from depot_system import DepotEndpoint
+from backend.accounts_to_database import UTILITIES, ENDPOINT
+
+from backend.depot_system import DepotEndpoint
+from backend.sql_tests import cursor
 
 
 class LeaderboardEndpoint:
@@ -28,9 +32,13 @@ class LeaderboardEndpoint:
         """
         conn.row_factory = sqlite3.Row
         cursor = conn.cursor()
-        cursor.execute("SELECT username, net_worth, last_updated FROM leaderboard ORDER BY net_worth DESC")
-        leaderboard_data = [dict(row) for row in cursor.fetchall()]
+        leaderboard_data = []
+        for user_id in ENDPOINT.get_all_user_ids(conn):
+            cursor.execute(f"SELECT user_id_fk, net_worth, last_updated FROM "
+                           f"leaderboard WHERE user_id_fk='{user_id}' ORDER BY net_worth")
+            leaderboard_data.append(dict(cursor.fetchone()))
         conn.row_factory = None  # Auf Standard zurücksetzen
+        #später effizientere methode finden
         return leaderboard_data
 
     @staticmethod
@@ -45,15 +53,32 @@ class LeaderboardEndpoint:
 
         conn.row_factory = sqlite3.Row
         cursor = conn.cursor()
-        sql = "SELECT username, net_worth, last_updated FROM leaderboard ORDER BY net_worth DESC LIMIT ? OFFSET ?"
+        #sql = "SELECT user_id_fk, net_worth, last_updated FROM leaderboard ORDER BY net_worth DESC LIMIT ? OFFSET ?"
+        sql = (
+            "WITH RankedEntries AS ("
+                   "SELECT user_id_fk, net_worth, last_updated, ROW_NUMBER() "
+                        "OVER("
+                            "PARTITION BY user_id_fk "
+                            "ORDER BY last_updated DESC"
+                        ") "
+                        "as rn FROM leaderboard"
+                ") "
+               "SELECT user_id_fk, net_worth, last_updated "
+               "FROM RankedEntries "
+               "WHERE rn = 1 "
+               "ORDER BY net_worth DESC "
+               "LIMIT ? OFFSET ?;"
+               )
         cursor.execute(sql, (page_size, offset))
 
         paginated_data = [dict(row) for row in cursor.fetchall()]
+        for i in paginated_data:
+            i["username"] = UTILITIES.get_username(conn, i["user_id_fk"])
         conn.row_factory = None
         return paginated_data
 
     @staticmethod
-    def update_net_worth_for_user(conn: sqlite3.Connection, user_id: int) -> bool :
+    def insert_current_net_worth_for_user(conn: sqlite3.Connection, user_id: int) -> bool :
         """
         Berechnet und aktualisiert das Gesamtvermögen für EINEN einzelnen Benutzer.
         Gibt das Ergebnis als Dictionary zurück.
@@ -70,127 +95,123 @@ class LeaderboardEndpoint:
         # 4. Aktualisiere oder füge den Eintrag im Leaderboard hinzu (Upsert)
         now = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
         sql_upsert = """
-            INSERT INTO leaderboard (user_id_fk, username, net_worth, last_updated)
-            VALUES (?, ?, ?, ?)
-            ON CONFLICT(user_id_fk) DO UPDATE SET
-            net_worth = excluded.net_worth,
-            last_updated = excluded.last_updated;
+            INSERT INTO leaderboard (user_id_fk, net_worth, last_updated)
+            VALUES (?, ?, ?)
         """
-        cursor.execute(sql_upsert, (user_id, username, net_worth, now))
+        cursor.execute(sql_upsert, (user_id, net_worth, now))
 
         return True
 
     @staticmethod
-    def update_all_net_worths(conn: sqlite3.Connection) -> dict:
+    def insert_all_current_net_worths(conn: sqlite3.Connection) -> dict:
         """
         Berechnet das Gesamtvermögen für ALLE Benutzer und aktualisiert das Leaderboard.
         Dies ist eine aufwendige Operation.
         """
         print("Starte die Berechnung des Gesamtvermögens für alle Benutzer. Dies kann einen Moment dauern...")
+        all_users = ENDPOINT.get_all_user_ids(conn)
+        for user_id in all_users:
+            LeaderboardEndpoint.insert_current_net_worth_for_user(conn, user_id)
+        return {"success": True}
 
-        # Schritt 1: Alle Benutzerdaten und Portfolios aus der DB holen
+    @staticmethod
+    def delete_row(conn: sqlite3.Connection, row_id: int) -> None:
+        sql = "DELETE FROM leaderboard WHERE id = ?"
         cursor = conn.cursor()
-        cursor.execute("SELECT user_id, username, money FROM all_users") # lieber Utilities aufrufen
-        all_users = cursor.fetchall()
+        cursor.execute(sql, (row_id,))
 
-        cursor.execute("SELECT user_id_fk, ticker, quantity FROM stock_depot")
-        all_positions_raw = cursor.fetchall()
-
-        # Portfolios pro User gruppieren für einfachen Zugriff
-        portfolios = defaultdict(list)
-        all_tickers = set()
-        for user_id, ticker, quantity in all_positions_raw:
-            portfolios[user_id].append({'ticker': ticker, 'quantity': quantity})
-            all_tickers.add(ticker)
-
-        # Schritt 2: Alle benötigten Aktienkurse in einem einzigen Aufruf abfragen
-        print(f"Rufe aktuelle Kurse für {len(all_tickers)} einzigartige Ticker ab...")
-        prices = {}
-        if all_tickers:
-            try:
-                data = yf.download(list(all_tickers), period="1d", progress=False, group_by='ticker')
-                if not data.empty:
-                    for ticker in all_tickers:
-                        # yfinance gibt manchmal Spalten mit Multi-Index zurück
-                        try:
-                            # Versuche den Preis direkt zu bekommen
-                            price = data[ticker]['Close'].iloc[-1]
-                            if not pd.isna(price):  # Prüfe auf NaN
-                                prices[ticker] = price
-                        except (KeyError, IndexError):
-                            print(f"Warnung: Konnte keinen aktuellen Preis für {ticker} finden.")
-                            continue
-                else:
-                    print("Warnung: yfinance hat keine Daten zurückgegeben.")
-            except Exception as e:
-                return {"success": False, "message": f"Fehler bei yfinance-Abfrage: {e}"}
-
-        # Schritt 3: Net Worth für jeden User berechnen und in die DB schreiben
-        print("Berechne Gesamtvermögen und aktualisiere das Leaderboard...")
-        leaderboard_updates = []
-        now = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-
-        for user_id, username, cash_balance in all_users:
-            portfolio_value = 0.0
-            user_portfolio = portfolios.get(user_id, [])
-            for position in user_portfolio:
-                price = prices.get(position['ticker'], 0.0)  # Nutze 0.0 wenn Preis nicht verfügbar
-                portfolio_value += position['quantity'] * price
-
-            net_worth = cash_balance + portfolio_value
-            leaderboard_updates.append((user_id, username, net_worth, now))
-
-        # Schritt 4: Alle Updates in einer Transaktion in die DB schreiben (Upsert)
-        sql_upsert = """
-            INSERT INTO leaderboard (user_id_fk, username, net_worth, last_updated)
-            VALUES (?, ?, ?, ?)
-            ON CONFLICT(user_id_fk) DO UPDATE SET
-            net_worth = excluded.net_worth,
-            last_updated = excluded.last_updated;
+    @staticmethod
+    def fetch_and_group_leaderboard(conn: sqlite3.Connection) -> dict:
         """
-        cursor.executemany(sql_upsert, leaderboard_updates)
+        Holt alle Einträge aus der 'leaderboard'-Tabelle, sortiert sie und
+        formatiert sie in ein verschachteltes Dictionary.
 
-        print("Leaderboard wurde erfolgreich aktualisiert.")
-        return {"success": True, "message": f"{len(all_users)} Benutzer im Leaderboard aktualisiert."}
+        :param db_path: Der Dateipfad zur SQLite-Datenbank.
+        :return: Ein Dictionary, gruppiert nach user_id_fk.
+                 Beispiel: {1: [{'last_updated': '...', 'net_worth': ...}, ...]}
+        """
+        sql_query = """
+            SELECT id, user_id_fk, last_updated, net_worth
+            FROM leaderboard
+            ORDER BY user_id_fk ASC, last_updated DESC;
+        """
+
+        grouped_data = collections.defaultdict(list)
+
+        conn.row_factory = sqlite3.Row
+
+        cursor = conn.cursor()
+        cursor.execute(sql_query)
+
+        for row in cursor.fetchall():
+            user_id = row['user_id_fk']
+
+            # Erstellt das innere Dictionary für die Liste.
+            data_entry = {
+                "date": row['last_updated'],
+                "net_worth": row['net_worth'],
+                "row_id": row['id'],
+                "datetime": datetime.strptime(row['last_updated'], '%Y-%m-%d %H:%M:%S'),
+            }
+
+            grouped_data[user_id].append(data_entry)
+
+        return dict(grouped_data)
+
+    @staticmethod
+    def decimate_entries(conn:sqlite3.Connection, target:int=200):
+        all_data = LeaderboardEndpoint.fetch_and_group_leaderboard(conn)
+        for user_id, data in all_data.items():
+            print(f"betrachte Nutzer {user_id}. Datenlänge: {len(data)}")
+            to_delete_rows = []
+            og_length = len(data)
+
+            #gleiche löschen
+            if len(data) >= 2:
+                for i in range(len(data) - 2, -1, -1):
+                    if data[i]['net_worth'] == data[i+1]['net_worth']:
+                        to_delete_rows.append(data[i]['row_id'])
+                        data.pop(i)
+
+            delta = [data[i]["datetime"] - data[i - 1]["datetime"] for i in range(1, len(data))]
+
+            while True:
+                if og_length - len(to_delete_rows) <= target:
+                    break
+
+                mini_mum = min(delta)
+                i_minimum = delta.index(mini_mum)
+                if i_minimum == 0:
+                    to_delete_rows.append(data[i_minimum + 1]["row_id"])
+                    delta[i_minimum + 1] = delta[i_minimum + 1] + delta[i_minimum]
+                    delta.pop(i_minimum)
+                    data.pop(i_minimum + 1)
+                else:
+                    to_delete_rows.append(data[i_minimum]["row_id"])
+                    delta[i_minimum - 1] = delta[i_minimum - 1] + delta[i_minimum]
+                    delta.pop(i_minimum)
+                    data.pop(i_minimum)
+
+            for i in to_delete_rows:
+                LeaderboardEndpoint.delete_row(conn, i)
 
 
-# Dieser Block wird nur ausgeführt, wenn das Skript direkt gestartet wird
-if __name__ == '__main__':
-    import pandas as pd  # yfinance benötigt pandas, importieren wir es hier für den Fall der Fälle
 
-    DB_FILE = "StockBroker.db"
-    conn = None
 
-    try:
-        conn = sqlite3.connect(DB_FILE)
 
-        # Gesamtes Leaderboard für alle User aktualisieren
-        update_result = LeaderboardEndpoint.update_all_net_worths(conn)
-        print(f"Update-Ergebnis: {update_result['message']}")
 
-        if update_result['success']:
-            # Wichtig: Änderungen committen!
-            conn.commit()
-            print("\n--- Vollständiges Leaderboard ---")
-            full_lb = LeaderboardEndpoint.get_leaderboard(conn)
-            for i, entry in enumerate(full_lb):
-                print(f"{i + 1}. {entry['username']}: {entry['net_worth']:.2f}€")
 
-            print("\n--- Leaderboard Seite 1 (Top 2) ---")
-            page1 = LeaderboardEndpoint.get_paginated_leaderboard(conn, page=1, page_size=2)
-            for entry in page1:
-                print(f"- {entry['username']}: {entry['net_worth']:.2f}€")
 
-            print("\n--- Leaderboard Seite 2 (Platz 3-4) ---")
-            page2 = LeaderboardEndpoint.get_paginated_leaderboard(conn, page=2, page_size=2)
-            for entry in page2:
-                print(f"- {entry['username']}: {entry['net_worth']:.2f}€")
-        else:
-            conn.rollback()
 
-    except sqlite3.Error as e:
-        print(f"Ein Datenbankfehler ist aufgetreten: {e}")
-    finally:
-        if conn:
-            conn.close()
-            print("\nDatenbankverbindung wurde geschlossen.")
+
+
+
+
+
+
+
+
+
+
+
+

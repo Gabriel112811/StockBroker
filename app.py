@@ -13,7 +13,7 @@ from apscheduler.schedulers.background import BackgroundScheduler
 
 
 # Lokale Imports
-from backend.accounts_to_database import ENDPOINT as AccountEndpoint
+from backend.accounts_to_database import ENDPOINT as AccountEndpoint, ENDPOINT
 from backend.accounts_to_database import UTILITIES
 from backend.trading import TradingEndpoint # Geänderter Import
 from backend.leaderboard import LeaderboardEndpoint
@@ -34,6 +34,14 @@ def get_db():
     if db is None:
         db = g._database = sqlite3.connect(DATABASE_FILE)
     return db
+
+with app.app_context():
+    conn = get_db()
+    #print(
+    #    LeaderboardEndpoint.decimate_entries(conn, 20)
+    #)
+    conn.close()
+
 
 
 @app.teardown_appcontext
@@ -113,7 +121,7 @@ def scheduled_leaderboard_processing_job():
         db = get_db()
         try:
             print("[Scheduler 2] Berechne das leaderboard Neu...")
-            result = LeaderboardEndpoint.update_all_net_worths(db)
+            result = LeaderboardEndpoint.insert_all_current_net_worths(db)
             if result.get('success'):
                 print("Leaderboard erfolgreich aktualisiert")
             db.commit()
@@ -650,11 +658,20 @@ def dashboard_page():
         return redirect(url_for('logout'))
 
     # Platzhalter-Daten für den Graphen
-    history_data = [
-        {"date": "2025-06-14 20:18:29", "net_worth": 50000.0},
-        {"date": "2025-06-15 20:18:29", "net_worth": 51000.0},
-        {"date": "2025-06-16 20:18:29", "net_worth": 49000.0}
-    ]
+    history_data = LeaderboardEndpoint.fetch_and_group_leaderboard(conn)
+
+    if not session.get('user_id') in history_data.keys():
+        LeaderboardEndpoint.insert_current_net_worth_for_user(conn, user_id)
+        history_data = LeaderboardEndpoint.fetch_and_group_leaderboard(conn)
+
+    if session.get('user_id') in history_data.keys():
+        history_data = history_data[session.get('user_id')]
+    else:
+        history_data = [
+            {"date": datetime.now().strftime('%Y-%m-%d %H:%M:%S'), "net_worth": 50000.0},
+            {"date": datetime.now().strftime('%Y-%m-%d %H:%M:%S'), "net_worth": 50000.0},
+        ]
+
 
     # NEU: Dark-Mode-Status aus dem globalen 'g'-Objekt holen
     dark_mode_status = g.user_settings and g.user_settings.get('dark_mode') == 1

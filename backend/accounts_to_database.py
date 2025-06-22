@@ -457,7 +457,7 @@ class ENDPOINT:
 
     #unused
     @staticmethod
-    def get_all_users(conn: sqlite3.Connection) -> list[dict]:
+    def get_all_users_data(conn: sqlite3.Connection) -> list[dict]:
         """ohne sensible Daten wie Passwort-Hashes"""
         # conn.row_factory ermöglicht direkten Zugriff auf Spalten per Namen
         #danke an w3 schools
@@ -471,6 +471,24 @@ class ENDPOINT:
 
         conn.row_factory = None  # Setze zurück auf Standard
         return users
+
+    @staticmethod
+    def get_all_user_ids(conn: sqlite3.Connection) -> list:
+        """ohne sensible Daten wie Passwort-Hashes"""
+        # conn.row_factory ermöglicht direkten Zugriff auf Spalten per Namen
+        # danke an w3 schools
+        conn.row_factory = sqlite3.Row
+        cursor = conn.cursor()
+        cursor.execute("SELECT user_id FROM all_users")
+
+        # Erstellt eine Liste von Dictionaries, was viel lesbarer ist
+        # eventuell pretty print: pprint()
+        users = [dict(row)["user_id"] for row in cursor.fetchall()]
+        #most gay ever
+
+        conn.row_factory = None  # Setze zurück auf Standard
+        return users
+
 
     @staticmethod
     def get_balance(conn: sqlite3.Connection, username: str=None, user_id: int=None) -> float | None:

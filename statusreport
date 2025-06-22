@@ -4,10 +4,15 @@ Wenn man auf jetzt handeln geht, soll man nach dem anmelden auf die trading-seit
 
 Z145 in app.py muss noch geguckt werden, das das result auch richtig zu user gegeben wird.
 
-Bei aktualisierung des leaderboard immer wert speichern. Ein mal pro tag durchgehen: zb 200 werte behalten.
-iterativ den mit dem kürzesten timedelta löschen, bis von mehr als 200 werten auf 200 werte gekommen.
-+ stündlich von letzter woche behalten.
 
-Depot mit farben machen
+Depot mit farben machen + % plus
+
+Farben des Depot charts
+Depot chart prozen angaben fixxen
+
+clearname im depot evtl in sql speichern
+
+Leaderboard ig namen
+
 
 emails stripen
