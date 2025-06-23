@@ -548,7 +548,6 @@ class ENDPOINT:
 
         # In all_users, leaderboard, etc. aktualisieren
         conn.execute("UPDATE all_users SET username = ? WHERE user_id = ?", (new_username, user_id))
-        conn.execute("UPDATE leaderboard SET username = ? WHERE user_id_fk = ?", (new_username, user_id))
 
         # Zeitstempel der Änderung aktualisieren
         now_str = datetime.now().strftime('%Y-%m-%d %H:%M:%S')

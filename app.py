@@ -22,7 +22,10 @@ from backend.tokens import TokenEndpoint
 from backend.accounts_to_database import Settings
 
 app = Flask(__name__)
-app.secret_key = os.urandom(24)
+app.secret_key = os.getenv("app_secret") #Passwort aus den envs holen, da wir ja Professionell arbeiten
+if not os.getenv("app_secret"):
+    raise ValueError("kein key in dein env Variablen")
+
 
 #PyCharms sql modus muss beendet werden
 DATABASE_FILE = "backend/StockBroker.db"
@@ -37,10 +40,11 @@ def get_db():
 
 with app.app_context():
     conn = get_db()
-    #print(
-    #    LeaderboardEndpoint.decimate_entries(conn, 20)
-    #)
+    print(
+        LeaderboardEndpoint.get_paginated_leaderboard(conn)
+    )
     conn.close()
+    exit()
 
 
 
@@ -829,7 +833,6 @@ def stock_detail_page(ticker_symbol):
 
 @app.route('/leaderboard')
 def leaderboard_page():
-    # --- Paginierungs-Setup ---
     page = request.args.get('page', 1, type=int)
     if page < 1:
         page = 1
@@ -837,13 +840,9 @@ def leaderboard_page():
 
     conn = get_db()
 
-    # Holen Sie die Daten für die aktuelle Seite
-    # HINWEIS: Ich gehe davon aus, dass Sie LeaderboardEndpoint importiert haben.
-    # from backend.leaderboard import LeaderboardEndpoint
     paginated_data = LeaderboardEndpoint.get_paginated_leaderboard(conn, page=page, page_size=page_size)
 
-    # Holen Sie die Gesamtzahl der Benutzer, um die Gesamtseitenzahl zu berechnen
-    total_users = conn.execute("SELECT COUNT(user_id_fk) FROM leaderboard").fetchone()[0]
+    total_users = LeaderboardEndpoint.count_users(conn)
     total_pages = math.ceil(total_users / page_size)
 
     conn.close()

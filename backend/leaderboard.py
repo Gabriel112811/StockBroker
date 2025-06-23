@@ -16,7 +16,6 @@ from collections import defaultdict
 from backend.accounts_to_database import UTILITIES, ENDPOINT
 
 from backend.depot_system import DepotEndpoint
-from backend.sql_tests import cursor
 
 
 class LeaderboardEndpoint:
@@ -30,15 +29,46 @@ class LeaderboardEndpoint:
         Gibt das komplette Leaderboard als Liste von Dictionaries aus,
         sortiert nach dem Gesamtvermögen (net_worth).
         """
+
+        user_ids = ENDPOINT.get_all_user_ids(conn)
+
+        if not user_ids: # keine User = kein Ergebnis
+            return []
+
         conn.row_factory = sqlite3.Row
         cursor = conn.cursor()
-        leaderboard_data = []
-        for user_id in ENDPOINT.get_all_user_ids(conn):
-            cursor.execute(f"SELECT user_id_fk, net_worth, last_updated FROM "
-                           f"leaderboard WHERE user_id_fk='{user_id}' ORDER BY net_worth")
-            leaderboard_data.append(dict(cursor.fetchone()))
-        conn.row_factory = None  # Auf Standard zurücksetzen
-        #später effizientere methode finden
+
+        placeholders = ','.join(['?'] * len(user_ids))
+        sql_query = f"""
+                SELECT
+                    user_id_fk,
+                    net_worth,
+                    last_updated
+                FROM (
+                    SELECT
+                        user_id_fk,
+                        net_worth,
+                        last_updated,
+                        -- Weist jeder Zeile eine Nummer zu, partitioniert nach User,
+                        -- sortiert nach dem neuesten Datum zuerst.
+                        ROW_NUMBER() OVER(PARTITION BY user_id_fk ORDER BY last_updated DESC) as rn
+                    FROM
+                        leaderboard
+                    WHERE
+                        user_id_fk IN ({placeholders})
+                )
+                -- Wähle nur die Zeilen aus, die der jeweils neueste Eintrag sind (rn = 1)
+                WHERE rn = 1;
+            """
+
+        cursor.execute(sql_query, user_ids)
+
+        leaderboard_data = [dict(row) for row in cursor.fetchall()] # unsere standart list_dict comprehension
+
+        conn.row_factory = None
+
+        #später effizientere methode finden || habe ich jetzt gemacht suiii
+
         return leaderboard_data
 
     @staticmethod
@@ -194,6 +224,33 @@ class LeaderboardEndpoint:
 
             for i in to_delete_rows:
                 LeaderboardEndpoint.delete_row(conn, i)
+
+    @staticmethod
+    def get_all_user_ids(conn) -> list[int]:
+
+        sql_query = "SELECT DISTINCT user_id_fk FROM leaderboard;"
+
+        cursor = conn.cursor()
+        cursor.execute(sql_query)
+
+        user_ids = [row[0] for row in cursor.fetchall()]
+
+        return user_ids
+
+    @staticmethod
+    def count_users(conn) -> int:
+        # wie LeaderboardEndpont.get_all_user_ids() nur mit count
+        sql_query = "SELECT COUNT(DISTINCT user_id_fk) FROM leaderboard;"
+
+        cursor = conn.cursor()
+        cursor.execute(sql_query)
+
+        count = cursor.fetchone()[0]
+
+        return count
+
+
+
 
 
 
