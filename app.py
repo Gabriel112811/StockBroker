@@ -103,55 +103,6 @@ def cancel_order_route(order_id):
         flash(result.get('message'), 'error')
     return redirect(url_for('my_orders_page'))
 
-def scheduled_order_processing_job():
-    """Wird vom Scheduler aufgerufen, um offene Aufträge zu verarbeiten."""
-    # app_context wird benötigt, damit der Hintergrund-Thread auf die App und die DB zugreifen kann
-    with app.app_context():
-        db = get_db()
-        try:
-            print("[Scheduler] Verarbeite offene Aufträge...")
-            TradingEndpoint.process_open_orders(db)
-            db.commit()
-        except Exception as e:
-            print(f"[Scheduler] Fehler im Job 'process_open_orders': {e}")
-
-def scheduled_leaderboard_processing_job():
-    with app.app_context():
-        db = get_db()
-        try:
-            print("[Scheduler 2] Berechne das leaderboard Neu...")
-            result = LeaderboardEndpoint.insert_all_current_net_worths(db)
-            if result.get('success'):
-                print("Leaderboard erfolgreich aktualisiert")
-            db.commit()
-        except Exception as e:
-            print(f"[Scheduler] Fehler im Job 'leaderboard_processing_job': {e}")
-
-def scheduled_daily_processing_job():
-    with app.app_context():
-        db = get_db()
-        try:
-            print("Starte Daily Scheduler")
-            TokenEndpoint.remove_expired_tokens()
-            db.commit()
-        except Exception as e:
-            print(f"[Scheduler] Fehler im Job 'leaderboard_processing_job': {e}")
-
-# scheduler_1_min = BackgroundScheduler(daemon=True)
-# scheduler_1_min.add_job(scheduled_order_processing_job, 'interval', seconds=60)
-# scheduler_1_min.start()
-#
-# scheduler_10_minuets = BackgroundScheduler(daemon=True)
-# scheduler_10_minuets.add_job(scheduled_leaderboard_processing_job, 'interval', seconds=60)
-# scheduler_10_minuets.start()
-#
-# scheduler_daily = BackgroundScheduler(daemon=True)
-# scheduler_daily.add_job(scheduled_daily_processing_job, 'interval', seconds=60)
-# scheduler_daily.start()
-#
-# scheduled_order_processing_job()
-# scheduled_leaderboard_processing_job()
-# scheduled_daily_processing_job()
 
 # -- Konstanten für Dropdown-Optionen beim Graph --
 AVAILABLE_PERIODS = [
