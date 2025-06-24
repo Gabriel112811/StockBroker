@@ -57,6 +57,11 @@ def _date_to_month_year(join_date_string:str) -> str:
 
     return formatted_date
 
+def _update_last_login_date(conn: sqlite3.Connection, user_id:int):
+    cursor = conn.cursor()
+    login_time = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+    cursor.execute("UPDATE all_users SET last_login = ? WHERE user_id = ?", (login_time, user_id))
+
 
 class UTILITIES:
     """Enthält statische Utility-Methoden, die von mehreren Modulen genutzt werden können."""
@@ -278,12 +283,19 @@ class ENDPOINT:
             hashed_password, salt = UTILITIES.hash_password(password)
             cursor = conn.cursor()
             sql_command = """
-                INSERT INTO all_users (username, password_hash, salt, email, money, joined_date, is_verified) 
-                VALUES (?, ?, ?, ?, ?, ?, ?)
+                INSERT INTO all_users (username, password_hash, salt, email, money, joined_date, is_verified, last_login) 
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
             """
             params = (
-            username, hashed_password, salt, email.lower(), 50000.0, datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
-            is_verified)
+                username,
+                hashed_password,
+                salt,
+                email.lower(),
+                50000.0,
+                datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+                is_verified,
+                None
+            )
             cursor.execute(sql_command, params)
 
 
@@ -349,6 +361,8 @@ class ENDPOINT:
                 # verification_token = TokenEndpoint.generate_email_token(conn, user_id)
                 # send_confirmation_email(user_email, username, verification_token)
                 return output
+
+            _update_last_login_date(conn, user_id)
 
             output["success"] = True
             output["message"] = f"Willkommen zurück, {username}!"
@@ -484,7 +498,7 @@ class ENDPOINT:
         # Erstellt eine Liste von Dictionaries, was viel lesbarer ist
         # eventuell pretty print: pprint()
         users = [dict(row)["user_id"] for row in cursor.fetchall()]
-        #most gay ever
+        #nice
 
         conn.row_factory = None  # Setze zurück auf Standard
         return users
@@ -594,3 +608,6 @@ if __name__ == "__main__":
     print(
     UTILITIES.is_ig_link_valid("https://www.instagram.com/gabriel_112811/profilecard/?igsh=MTcxbmFlcXV5NzVkeQ==")
 )
+
+"ALTER TABLE all_users ADD COLUMN last_login DATETIME;"
+"UPDATE all_users SET last_login = joined_date;"

@@ -7,7 +7,11 @@ from jinja2 import Environment, FileSystemLoader
 
 import json
 
+url = "https://stockbroker.ddns.net"
+
 path = "keys.json" if os.path.exists("keys.json") else "backend/keys.json"
+
+
 with open(path, 'r') as f:
     daten = json.load(f)
     SENDER_EMAIL, SENDER_PASSWORD = daten['address'], daten['gmail_app_password']

@@ -10,7 +10,7 @@ import sqlite3
 import collections
 import yfinance as yf
 import pandas as pd
-from datetime import datetime
+from datetime import datetime, timedelta
 from collections import defaultdict
 
 from backend.accounts_to_database import UTILITIES, ENDPOINT
@@ -145,10 +145,28 @@ class LeaderboardEndpoint:
         return {"success": True}
 
     @staticmethod
-    def delete_row(conn: sqlite3.Connection, row_id: int) -> None:
+    def delete_row(conn: sqlite3.Connection, row_id: int):
         sql = "DELETE FROM leaderboard WHERE id = ?"
         cursor = conn.cursor()
         cursor.execute(sql, (row_id,))
+
+    @staticmethod
+    def delete_multiple_rows(conn: sqlite3.Connection, row_ids: list[int]):
+        if not row_ids:
+            print("Keine IDs zum Löschen übergeben.")
+            return
+
+        placeholders = ', '.join(['?'] * len(row_ids))
+
+        sql = f"DELETE FROM leaderboard WHERE id IN ({placeholders})"
+
+        cursor = conn.cursor()
+        try:
+            cursor.execute(sql, row_ids)
+            print(f"{cursor.rowcount} Zeile(n) erfolgreich gelöscht.")
+
+        except sqlite3.Error as e:
+            print(f"Ein Datenbankfehler ist aufgetreten: {e}")
 
     @staticmethod
     def fetch_and_group_leaderboard(conn: sqlite3.Connection) -> dict:
@@ -156,9 +174,8 @@ class LeaderboardEndpoint:
         Holt alle Einträge aus der 'leaderboard'-Tabelle, sortiert sie und
         formatiert sie in ein verschachteltes Dictionary.
 
-        :param db_path: Der Dateipfad zur SQLite-Datenbank.
-        :return: Ein Dictionary, gruppiert nach user_id_fk.
-                 Beispiel: {1: [{'last_updated': '...', 'net_worth': ...}, ...]}
+        :param conn: SQLite3 Connection. Verbindung zur DB
+        :return: dict
         """
         sql_query = """
             SELECT id, user_id_fk, last_updated, net_worth
@@ -189,41 +206,49 @@ class LeaderboardEndpoint:
         return dict(grouped_data)
 
     @staticmethod
-    def decimate_entries(conn:sqlite3.Connection, target:int=200):
+    def decimate_entries(conn:sqlite3.Connection, target:int=250):
+        if target < 10:
+            return
         all_data = LeaderboardEndpoint.fetch_and_group_leaderboard(conn)
-        for user_id, data in all_data.items():
-            print(f"betrachte Nutzer {user_id}. Datenlänge: {len(data)}")
-            to_delete_rows = []
-            og_length = len(data)
 
-            #gleiche löschen
-            if len(data) >= 2:
-                for i in range(len(data) - 2, -1, -1):
-                    if data[i]['net_worth'] == data[i+1]['net_worth']:
-                        to_delete_rows.append(data[i]['row_id'])
-                        data.pop(i)
+        to_delete_rows = []
+        for user_id, data in all_data.items():
+            #print(f"betrachte Nutzer {user_id}. Datenlänge: {len(data)}")
+
+            #data = [i for i in data if i["datetime"] <= datetime.now() - timedelta(days=7)]
+
+            user_to_delete_rows = []
+            if len(data) >= 2: #gleiche Werte Löschen
+                for i in range(len(data) - 3, -1, -1):
+                    #if len(data) <= target:
+                        #break
+                    #Wir mit neuer in der mitte löschen methode nicht benötigt
+
+                    #in der Mitte löschen. Es wird bei 3 gleichen Werten der Wert in der mitte gelöscht
+                    if data[i]['net_worth'] == data[i+1]['net_worth'] == data[i+2]['net_worth']:
+                        user_to_delete_rows.append(data[i+1]['row_id'])
+                        data.pop(i+1)
+                #if len(user_to_delete_rows) > 0:
+                    #print(f"{len(user_to_delete_rows)} doppelte gelöscht")
 
             delta = [data[i]["datetime"] - data[i - 1]["datetime"] for i in range(1, len(data))]
 
-            while True:
-                if og_length - len(to_delete_rows) <= target:
-                    break
+            while len(data) > target:
+                minimum_delta = min(delta)
+                index_min_delta = delta.index(minimum_delta)
+                if index_min_delta == 0:
+                    index_min_delta = 1
 
-                mini_mum = min(delta)
-                i_minimum = delta.index(mini_mum)
-                if i_minimum == 0:
-                    to_delete_rows.append(data[i_minimum + 1]["row_id"])
-                    delta[i_minimum + 1] = delta[i_minimum + 1] + delta[i_minimum]
-                    delta.pop(i_minimum)
-                    data.pop(i_minimum + 1)
-                else:
-                    to_delete_rows.append(data[i_minimum]["row_id"])
-                    delta[i_minimum - 1] = delta[i_minimum - 1] + delta[i_minimum]
-                    delta.pop(i_minimum)
-                    data.pop(i_minimum)
+                user_to_delete_rows.append(
+                    data.pop(index_min_delta)["row_id"]
+                )
+                delta[index_min_delta - 1] = delta[index_min_delta - 1] + delta.pop(index_min_delta)
 
-            for i in to_delete_rows:
-                LeaderboardEndpoint.delete_row(conn, i)
+
+            #print(f"{user_id}: {len(user_to_delete_rows)} wurden gelöscht.")
+            to_delete_rows += user_to_delete_rows
+
+        LeaderboardEndpoint.delete_multiple_rows(conn, to_delete_rows)
 
     @staticmethod
     def get_all_user_ids(conn) -> list[int]:

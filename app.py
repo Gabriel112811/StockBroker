@@ -10,6 +10,7 @@ import sqlite3
 from functools import wraps
 from datetime import datetime, timedelta
 from apscheduler.schedulers.background import BackgroundScheduler
+from pprint import pprint
 
 
 # Lokale Imports
@@ -22,31 +23,47 @@ from backend.tokens import TokenEndpoint
 from backend.accounts_to_database import Settings
 
 app = Flask(__name__)
-app.secret_key = os.getenv("app_secret") #Passwort aus den envs holen, da wir ja Professionell arbeiten
-if not os.getenv("app_secret"):
-    raise ValueError("kein key in dein env Variablen")
-
-
-#PyCharms sql modus muss beendet werden
+ALPHA_VANTAGE_API_KEY = None
 DATABASE_FILE = "backend/StockBroker.db"
 
-# Caching-Variable für das Leaderboard
+def __init__():
+    global ALPHA_VANTAGE_API_KEY, app
+    try:
+        with open('keys.json', 'r') as f:
+            keys = json.load(f)
+            secret_key = keys.get('APP_SECRET')
+            app.secret_key = secret_key
+            ALPHA_VANTAGE_API_KEY = keys.get('alpha_vantage_api_key')
+    except FileNotFoundError:
+        print("WARNUNG: keys.json nicht gefunden.")
+        raise
+    except json.JSONDecodeError:
+        print("WARNUNG: keys.json ist kein valides JSON.")
+        raise
+
+    if not secret_key:
+        print("WARNUNG: App_Secret nicht in keys.json gefunden oder Datei fehlerhaft.")
+        raise
+
+    if not ALPHA_VANTAGE_API_KEY:
+        print("WARNUNG: Alpha Vantage API Key nicht in keys.json gefunden oder Datei fehlerhaft.")
+        raise
+
+__init__()
 
 def get_db():
     db = getattr(g, '_database', None)
     if db is None:
         db = g._database = sqlite3.connect(DATABASE_FILE)
     return db
-
+# if name is main gezwungene alternative
 with app.app_context():
     conn = get_db()
-    print(
-        LeaderboardEndpoint.get_paginated_leaderboard(conn)
-    )
+    #pprint(LeaderboardEndpoint.decimate_entries(conn))
+    #pprint(LeaderboardEndpoint.decimate_entries(conn))
+
+    #conn.commit()
     conn.close()
-    exit()
-
-
 
 @app.teardown_appcontext
 def close_connection(exception):
@@ -63,7 +80,7 @@ def load_user_settings():
         conn = get_db()
         g.user_settings = Settings.get_settings(conn, session['user_id'])
 
-# --- Decorator ---
+# --- eigener Decorator ---
 def login_required(f):
     @wraps(f)
     def decorated_function(*args, **kwargs):
@@ -72,28 +89,6 @@ def login_required(f):
             return redirect(url_for('login_page'))
         return f(*args, **kwargs)
     return decorated_function
-
-  #--API--
-ALPHA_VANTAGE_API_KEY = None
-def configure_ALPHA_VANTAGE_API():
-    global ALPHA_VANTAGE_API_KEY
-    try:
-        with open('keys.json', 'r') as f:
-            keys = json.load(f)
-            ALPHA_VANTAGE_API_KEY = keys.get('alpha_vantage_api_key')
-            print("key erhalten")
-    except FileNotFoundError:
-        print("WARNUNG: keys.json nicht gefunden.")
-        raise
-    except json.JSONDecodeError:
-        print("WARNUNG: keys.json ist nicht valides JSON. Alpha Vantage API-Funktionalität ist deaktiviert.")
-        raise
-    if not ALPHA_VANTAGE_API_KEY:
-        print("WARNUNG: Alpha Vantage API Key nicht in keys.json gefunden oder Datei fehlerhaft.")
-        raise ValueError # Nur raise geht irgendwie nicht
-
-configure_ALPHA_VANTAGE_API()
-
 
 @app.route('/cancel_order/<int:order_id>', methods=['POST'])
 @login_required
@@ -142,21 +137,21 @@ def scheduled_daily_processing_job():
         except Exception as e:
             print(f"[Scheduler] Fehler im Job 'leaderboard_processing_job': {e}")
 
-scheduler_1_min = BackgroundScheduler(daemon=True)
-scheduler_1_min.add_job(scheduled_order_processing_job, 'interval', seconds=60)
-scheduler_1_min.start()
-
-scheduler_10_minuets = BackgroundScheduler(daemon=True)
-scheduler_10_minuets.add_job(scheduled_leaderboard_processing_job, 'interval', seconds=60)
-scheduler_10_minuets.start()
-
-scheduler_daily = BackgroundScheduler(daemon=True)
-scheduler_daily.add_job(scheduled_daily_processing_job, 'interval', seconds=60)
-scheduler_daily.start()
-
-scheduled_order_processing_job()
-scheduled_leaderboard_processing_job()
-scheduled_daily_processing_job()
+# scheduler_1_min = BackgroundScheduler(daemon=True)
+# scheduler_1_min.add_job(scheduled_order_processing_job, 'interval', seconds=60)
+# scheduler_1_min.start()
+#
+# scheduler_10_minuets = BackgroundScheduler(daemon=True)
+# scheduler_10_minuets.add_job(scheduled_leaderboard_processing_job, 'interval', seconds=60)
+# scheduler_10_minuets.start()
+#
+# scheduler_daily = BackgroundScheduler(daemon=True)
+# scheduler_daily.add_job(scheduled_daily_processing_job, 'interval', seconds=60)
+# scheduler_daily.start()
+#
+# scheduled_order_processing_job()
+# scheduled_leaderboard_processing_job()
+# scheduled_daily_processing_job()
 
 # -- Konstanten für Dropdown-Optionen beim Graph --
 AVAILABLE_PERIODS = [
@@ -983,19 +978,7 @@ def check_ig_link():
         print(e)
         return jsonify({'success': False, 'message': str(e)})
 
-from tree import data
 
-@app.route('/tree')
-def tree_page():
-
-    page_title = data['title']
-
-    # Wir wandeln das Python-Dictionary in einen JSON-String um.
-    # Dieser String wird sicher an das Template übergeben.
-    tree_json = json.dumps(data, ensure_ascii=False)
-
-    # Wir rendern das 'decision_tree.html'-Template aus dem /templates Ordner.
-    return render_template('decision_tree.html', title=page_title, tree_json=tree_json)
 
 
 if __name__ == '__main__':
