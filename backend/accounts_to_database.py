@@ -362,7 +362,7 @@ class ENDPOINT:
                 # send_confirmation_email(user_email, username, verification_token)
                 return output
 
-            _update_last_login_date(conn, user_id)
+            ENDPOINT.update_last_login_date(conn, user_id)
 
             output["success"] = True
             output["message"] = f"Willkommen zurück, {username}!"
@@ -434,16 +434,17 @@ class ENDPOINT:
 
             output["success"] = True
             output["message"] = "Dein Passwort wurde erfolgreich geändert."
+            output["user_id"] = user_id
         except sqlite3.Error as e:
             output["message"] = f"Datenbankfehler: {e}"
 
         return output
 
     @staticmethod
-    def verify_email_with_token(conn: sqlite3.Connection, token: str) -> dict:
+    def verify_email_delete_token(conn: sqlite3.Connection, token: str) -> dict:
         """Verifiziert einen E-Mail-Token und aktiviert den Account."""
         output = UTILITIES.get_base_protocol()
-        user_id = TokenEndpoint.verify_email_token(conn, token)
+        user_id = TokenEndpoint.verify_email_delete_token(conn, token)
 
         if user_id is None:
             output["message"] = "Der Verifizierungs-Code ist ungültig oder abgelaufen."
@@ -454,8 +455,8 @@ class ENDPOINT:
             cursor.execute("UPDATE all_users SET is_verified = 1 WHERE user_id = ?", (user_id,))
             if cursor.rowcount > 0:
                 output["success"] = True
-                output[
-                    "message"] = "Deine E-Mail-Adresse wurde erfolgreich verifiziert. Du kannst dich jetzt einloggen."
+                output["message"] = "Deine E-Mail-Adresse wurde erfolgreich verifiziert. Du kannst dich jetzt einloggen."
+                output["user_id"] = user_id
             else:
                 # Sollte nicht passieren, wenn Token valide war
                 output["message"] = "Fehler: zugehöriger Benutzer konnte nicht gefunden werden."
@@ -563,6 +564,12 @@ class ENDPOINT:
         conn.execute("UPDATE settings SET last_name_change = ? WHERE user_id_fk = ?", (now_str, user_id))
 
         return {"success": True, "message": "Benutzername erfolgreich geändert."}
+
+    @staticmethod
+    def update_last_login_date(conn: sqlite3.Connection, user_id: int):
+        cursor = conn.cursor()
+        login_time = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        cursor.execute("UPDATE all_users SET last_login = ? WHERE user_id = ?", (login_time, user_id))
 
 
 # Fügen Sie diese Klasse in accounts_to_database.py ein

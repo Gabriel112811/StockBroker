@@ -58,12 +58,12 @@ def get_db():
     return db
 # if name is main gezwungene alternative
 with app.app_context():
-    conn = get_db()
+    local_conn = get_db()
     #pprint(LeaderboardEndpoint.decimate_entries(conn))
     #pprint(LeaderboardEndpoint.decimate_entries(conn))
 
     #conn.commit()
-    conn.close()
+    local_conn.close()
 
 @app.teardown_appcontext
 def close_connection(exception):
@@ -114,6 +114,17 @@ AVAILABLE_QUALITIES = [
     ("high", "Hoch"), ("normal", "Normal"), ("low", "Niedrig")
 ]
 
+def do_login(conn, identifier:str=None , password:str=None, instant_login_result:dict=None):
+    result = AccountEndpoint.login(conn, identifier, password) if not instant_login_result else instant_login_result
+    if result.get('success'):
+        session['user_id'] = result.get('user_id')
+        session['user_email'] = result.get('email')
+        session['username'] = result.get('username')
+        flash(result.get('message', 'Login erfolgreich!'), 'success')
+        return redirect(url_for('dashboard_page'))
+    else:
+        flash(result.get('message', 'Login fehlgeschlagen.'), 'error')
+
 #--AUTH--
 @app.route('/login', methods=['GET', 'POST'])
 def login_page():
@@ -130,19 +141,10 @@ def login_page():
             flash('Bitte Anmeldedaten eingeben.', 'error')
         else:
             conn = get_db()
-            result = AccountEndpoint.login(conn, identifier, password)
-            if result.get('success'):
-                conn.commit()
-                session['user_id'] = result.get('user_id')
-                session['user_email'] = result.get('email')
-                session['username'] = result.get('username')
-                flash(result.get('message', 'Login erfolgreich!'), 'success')
-                return redirect(url_for('dashboard_page'))
-            else:
-                flash(result.get('message', 'Login fehlgeschlagen.'), 'error')
+            do_login(conn, identifier, password)
+            conn.commit()
 
     return render_template('auth/login.html', form_data=form_data)
-
 
 @app.route('/register', methods=['GET', 'POST'])
 def register_page():
@@ -200,9 +202,11 @@ def verify_email_page():
             flash('Bitte gib den Code aus der E-Mail ein.', 'error')
         else:
             conn = get_db()
-            result = AccountEndpoint.verify_email_with_token(conn, token)
+            result = AccountEndpoint.verify_email_delete_token(conn, token)
+            conn.commit()
             if result.get('success'):
-                conn.commit()
+                user_id = result.get('user_id')
+                do_login(conn, user_id, )
                 flash(result.get('message'), 'success')
                 return redirect(url_for('login_page'))
             else:
@@ -214,14 +218,13 @@ def verify_email_page():
 def verify_email_from_link(token):
     """Verarbeitet den Token direkt aus dem E-Mail-Link."""
     conn = get_db()
-    result = AccountEndpoint.verify_email_with_token(conn, token)
+    result = AccountEndpoint.verify_email_delete_token(conn, token)
     if result.get('success'):
         conn.commit()
         flash(result.get('message'), 'success')
     else:
         flash(result.get('message'), 'error')
     return redirect(url_for('login_page'))
-
 
 @app.route('/logout')
 def logout():
@@ -230,7 +233,6 @@ def logout():
     session.pop('username', None)
     flash('Du wurdest erfolgreich ausgeloggt.', 'info')
     return redirect(url_for('login_page'))
-
 
 @app.route('/reset-password-request', methods=['GET', 'POST'])
 def reset_password_request_page():
@@ -251,15 +253,12 @@ def reset_password_request_page():
 
     return render_template('auth/reset_request.html', form_data=form_data)
 
-
 @app.route('/reset-password/<token>', methods=['GET', 'POST'])
 def reset_password_confirm_page(token):
     conn = get_db()
     # verify_reset_token gibt jetzt ein Dictionary zurück
     token_verification = TokenEndpoint.verify_but_not_consume_password_token(conn, token)
-    print(f"token verification: {token_verification}")
     if not token_verification.get('success'):
-        print("no success")
         # Token ist bereits konsumiert oder ungültig, commit ist nicht nötig
         flash(token_verification.get('message', 'Ungültiger oder abgelaufenes Token.'), 'error')
         return redirect(url_for('login_page'))
@@ -277,16 +276,18 @@ def reset_password_confirm_page(token):
         else:
             #conn wird oben schon gemacht
             result = AccountEndpoint.reset_password_with_token(conn, token, new_password)
-            print(f"result: {result}")
-            if result["success"]:
-                print("success")
+            conn.commit()
+            if result.get('success'):
+                username = UTILITIES.get_username(conn, result["user_id"])
+                do_login(conn, identifier=username, password=new_password)
                 conn.commit() # just to be sure
+
                 flash(result.get('message', 'Passwort erfolgreich geändert.'), 'success')
+
                 return redirect(url_for('login_page'))
             else:
                 flash(result.get('message', 'Fehler beim Ändern des Passworts.'), 'error')
     return render_template('auth/reset_confirm.html', token=token)
-
 
 @app.route('/reset-password-enter-token', methods=['GET', 'POST'])
 def reset_password_enter_token_page():
