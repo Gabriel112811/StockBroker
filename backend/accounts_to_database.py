@@ -417,14 +417,9 @@ class ENDPOINT:
         return output
 
     @staticmethod
-    def verify_reset_token(conn: sqlite3.Connection, token: str) -> dict:
-        """Wrapper, der die neue Token-Struktur nutzt."""
-        return TokenEndpoint.verify_password_token(conn, token)
-
-    @staticmethod
     def reset_password_with_token(conn: sqlite3.Connection, token: str, new_password: str) -> dict:
         output = UTILITIES.get_base_protocol()
-        token_verification = ENDPOINT.verify_reset_token(conn, token)
+        token_verification = TokenEndpoint.verify_and_consume_password_token(conn, token)
 
         if not token_verification.get("success"):
             output["message"] = token_verification.get("message")
@@ -609,5 +604,3 @@ if __name__ == "__main__":
     UTILITIES.is_ig_link_valid("https://www.instagram.com/gabriel_112811/profilecard/?igsh=MTcxbmFlcXV5NzVkeQ==")
 )
 
-"ALTER TABLE all_users ADD COLUMN last_login DATETIME;"
-"UPDATE all_users SET last_login = joined_date;"

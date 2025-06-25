@@ -18,9 +18,9 @@ def when_ready(server):
     scheduler = BackgroundScheduler(daemon=True, timezone="Europe/Berlin")
 
     # Füge den Job hinzu, der jede Minute ausgeführt werden soll
-    scheduler.add_job(scheduled_order_processing_job(), 'cron', minute='*')
-    scheduler.add_job(scheduled_daily_processing_job(), 'cron', hour='5' ,minute='0')
-    scheduler.add_job(scheduled_leaderboard_processing_job(), 'cron', minute='*/10')
+    scheduler.add_job(scheduled_order_processing_job, 'cron', minute='*')
+    scheduler.add_job(scheduled_daily_processing_job, 'cron', hour='5' ,minute='0')
+    scheduler.add_job(scheduled_leaderboard_processing_job, 'cron', minute='*/10')
 
     # Starte den Scheduler
     scheduler.start()

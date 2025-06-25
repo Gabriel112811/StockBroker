@@ -33,13 +33,23 @@ class TokenEndpoint:
         return _verify_and_consume_token(conn, token, 'EMAIL_VERIFICATION')
 
     @staticmethod
-    def verify_password_token(conn: sqlite3.Connection, token: str) -> dict | None:
+    def verify_and_consume_password_token(conn: sqlite3.Connection, token: str) -> dict:
         """
         Verifiziert einen Passwort-Reset-Token und gibt bei Erfolg die user_id zurück.
         """
         user_id = _verify_and_consume_token(conn, token, 'PASSWORD_RESET')
         if user_id:
              return {"success": True, "user_id": user_id, "message": "Token valide"}
+        return {"success": False, "message": "Token ungültig oder abgelaufen"}
+
+    @staticmethod
+    def verify_but_not_consume_password_token(conn: sqlite3.Connection, token: str) -> dict:
+        """
+        Verifiziert einen Passwort-Reset-Token und gibt bei Erfolg die user_id zurück.
+        """
+        user_id = _verify_but_not_consume_token(conn, token, 'PASSWORD_RESET')
+        if user_id:
+            return {"success": True, "user_id": user_id, "message": "Token valide"}
         return {"success": False, "message": "Token ungültig oder abgelaufen"}
 
     @staticmethod
@@ -98,14 +108,32 @@ def _generate_and_store_token(conn: sqlite3.Connection, user_id: int | None, tok
 
 
 def _verify_and_consume_token(conn: sqlite3.Connection, raw_token: str, expected_type: str) -> int | None:
+
+
+    result = _verify_but_not_consume_token(conn, raw_token, expected_type)
+
+    if not result:
+        return None
+
+    user_id = result['user_id']
+    token_id = result['token_id']
+
+    cursor = conn.cursor()
+    cursor.execute("DELETE FROM secure_tokens WHERE id = ?", (token_id,))
+    cursor.connection.commit()
+
+    return user_id
+
+def _verify_but_not_consume_token(conn: sqlite3.Connection, raw_token: str, expected_type: str) -> dict | None:
     """
     Interne Kernfunktion: Verifiziert und löscht einen Token, um Wiederverwendung zu verhindern.
     Gibt die user_id bei Erfolg zurück, sonst None.
     """
     hashed_token = _hash_token(raw_token)
 
-    sql_find = "SELECT id, user_id_fk, expires_at FROM secure_tokens WHERE token_hash = ? AND token_type = ?"
     cursor = conn.cursor()
+
+    sql_find = "SELECT id, user_id_fk, expires_at FROM secure_tokens WHERE token_hash = ? AND token_type = ?"
 
     cursor.execute(sql_find, (hashed_token, expected_type))
     result = cursor.fetchone()
@@ -117,11 +145,8 @@ def _verify_and_consume_token(conn: sqlite3.Connection, raw_token: str, expected
     expires_at = datetime.fromisoformat(expires_at_str)
 
     if datetime.now() > expires_at:
-        # Token ist abgelaufen, löschen wir ihn trotzdem
         cursor.execute("DELETE FROM secure_tokens WHERE id = ?", (token_id,))
+        cursor.connection.commit()
         return None
 
-        # Token ist gültig. Löschen, um Wiederverwendung zu verhindern ("consume").
-    cursor.execute("DELETE FROM secure_tokens WHERE id = ?", (token_id,))
-
-    return user_id
+    return {"user_id": user_id, "token_id": token_id}

@@ -256,10 +256,12 @@ def reset_password_request_page():
 def reset_password_confirm_page(token):
     conn = get_db()
     # verify_reset_token gibt jetzt ein Dictionary zurück
-    token_verification = AccountEndpoint.verify_reset_token(conn, token)
+    token_verification = TokenEndpoint.verify_but_not_consume_password_token(conn, token)
+    print(f"token verification: {token_verification}")
     if not token_verification.get('success'):
+        print("no success")
         # Token ist bereits konsumiert oder ungültig, commit ist nicht nötig
-        flash(token_verification.get('message', 'Ungültiger oder abgelaufener Link.'), 'error')
+        flash(token_verification.get('message', 'Ungültiger oder abgelaufenes Token.'), 'error')
         return redirect(url_for('login_page'))
 
     if request.method == 'POST':
@@ -275,8 +277,10 @@ def reset_password_confirm_page(token):
         else:
             #conn wird oben schon gemacht
             result = AccountEndpoint.reset_password_with_token(conn, token, new_password)
-            if result.get('success'):
-                conn.commit()
+            print(f"result: {result}")
+            if result["success"]:
+                print("success")
+                conn.commit() # just to be sure
                 flash(result.get('message', 'Passwort erfolgreich geändert.'), 'success')
                 return redirect(url_for('login_page'))
             else:
