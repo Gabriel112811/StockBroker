@@ -15,8 +15,9 @@
     <table class="table table-striped table-hover">
         <thead>
             <tr>
-                <th style="width: 80px;">Rang</th>
-                <th>Username</th>
+                {# 1. Rang und Username linksbündig machen #}
+                <th style="text-align: left; width: 80px;">Rang</th>
+                <th style="text-align: left;">Username</th>
                 <th style="text-align: right;">Gesamtvermögen</th>
             </tr>
         </thead>
@@ -24,7 +25,14 @@
             {% for entry in leaderboard_data %}
             <tr>
                 <td>#{{ loop.index + ((current_page - 1) * 50) }}</td>
-                <td>{{ entry.username }}</td>
+                <td>
+                    {# 2. Dynamische Verlinkung und Farbgebung für den Benutzernamen #}
+                    {% if entry.link and entry.link != "" %}
+                        <a href="{{ entry.link }}" target="_blank" style="color: {{ entry.color }};" >{{ entry.username }}</a>
+                    {% else %}
+                        {{ entry.username }}
+                    {% endif %}
+                </td>
                 <td style="text-align: right;">{{ "€{:,.2f}".format(entry.net_worth) }}</td>
             </tr>
             {% else %}

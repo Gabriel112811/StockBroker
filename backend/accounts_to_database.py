@@ -91,6 +91,17 @@ class UTILITIES:
         return result[0] if result else None
 
     @staticmethod
+    def get_many_usernames(
+            conn: sqlite3.Connection, user_ids: set[int]) -> dict[int, str] | None:
+        placeholders = ', '.join(['?'] * len(user_ids))
+        sql_query = f"SELECT user_id, username FROM all_users WHERE user_id IN ({placeholders})"
+
+        cursor = conn.cursor()
+        cursor.execute(sql_query, list(user_ids))
+
+        return {user_id: username for user_id, username in cursor.fetchall()}
+
+    @staticmethod
     def is_username_in_db(conn: sqlite3.Connection, username: str) -> bool:
         cursor = conn.cursor()
         cursor.execute("SELECT 1 FROM all_users WHERE username = ?", (username,))
@@ -180,6 +191,7 @@ class UTILITIES:
         if parsed_url.netloc not in ['instagram.com', 'www.instagram.com', 'instagram.de', "www.instagram.de"]:
             result = UTILITIES.get_base_protocol()
             result.update({"message":"Die URL gehört nicht zu Instagram"})
+            return result
 
         # 2. Überprüfung der Pfadstruktur
         path = parsed_url.path
@@ -188,6 +200,7 @@ class UTILITIES:
         if not path or path == '/':
             result = UTILITIES.get_base_protocol()
             result.update({"message":"Du bist Instagram?"})
+            return result
 
         # Entferne führende und nachfolgende Schrägstriche für die Analyse
         path_segments = path.strip('/').split('/')
@@ -197,6 +210,7 @@ class UTILITIES:
         if path_segments[0] in bekannte_inhaltspfade:
             result = UTILITIES.get_base_protocol()
             result.update({"message":"Die URL führt nicht zu einem Profil"})
+            return result
 
 
         # 3. Validierung des Benutzernamens
@@ -206,7 +220,7 @@ class UTILITIES:
         # Darf nicht mit einem Punkt beginnen oder enden und keine aufeinanderfolgenden Punkte enthalten.
         if '..' in username or not (1 <= len(username) <= 30):
             result = UTILITIES.get_base_protocol()
-            result.update({"message": "ungültiger Benutzername"})
+            result.update({"message": "ungültiger Instagram Benutzername"})
             return result
 
         # Regex prüft auf gültige Zeichen und stellt sicher, dass Anfang/Ende kein Punkt ist.
@@ -217,10 +231,7 @@ class UTILITIES:
             return result
 
         result = UTILITIES.get_base_protocol()
-        result.update({
-            "success": True,
-            "message":"gültig"
-        })
+        result.update({"success": True, "message":"gültig"})
         return result
 
 
@@ -499,7 +510,6 @@ class ENDPOINT:
         conn.row_factory = None  # Setze zurück auf Standard
         return users
 
-
     @staticmethod
     def get_balance(conn: sqlite3.Connection, username: str=None, user_id: int=None) -> float | None:
         if username is None and user_id is None:
@@ -572,7 +582,6 @@ class ENDPOINT:
         cursor.execute("UPDATE all_users SET last_login = ? WHERE user_id = ?", (login_time, user_id))
 
 
-# Fügen Sie diese Klasse in accounts_to_database.py ein
 class Settings:
     """Verwaltet die Einstellungen eines Benutzers."""
 
@@ -597,6 +606,8 @@ class Settings:
     @staticmethod
     def update_instagram_link(conn: sqlite3.Connection, user_id: int, ig_link: str | None):
         """Aktualisiert oder löscht den Instagram-Link eines Benutzers."""
+        if not UTILITIES.is_ig_link_valid(ig_link):
+            return
         sql = "UPDATE settings SET ig_link = ? WHERE user_id_fk = ?"
         conn.execute(sql, (ig_link, user_id))
 
@@ -605,6 +616,22 @@ class Settings:
         """Schaltet den Dark Mode für einen Benutzer um."""
         sql = "UPDATE settings SET dark_mode = ? WHERE user_id_fk = ?"
         conn.execute(sql, (1 if dark_mode_status else 0, user_id))
+
+    @staticmethod
+    def get_link(conn: sqlite3.Connection, user_id:int) -> int | None:
+        conn.row_factory = sqlite3.Row
+        cursor = conn.cursor()
+        cursor.execute("SELECT ig_link FROM settings WHERE user_id_fk = ?", (user_id,))
+        return cursor.fetchone()
+
+    @staticmethod
+    def get_many_links(conn: sqlite3.Connection,user_ids: set[int]) -> dict[str: int] | None:
+        conn.row_factory = sqlite3.Row
+        cursor = conn.cursor()
+        placeholders = ', '.join(['?'] * len(user_ids))
+        sql_query = f"SELECT user_id_fk, ig_link FROM settings WHERE user_id_fk IN ({placeholders})"
+        cursor.execute(sql_query, list(user_ids))
+        return {user_id: ig_link for user_id, ig_link in cursor.fetchall()}
 
 if __name__ == "__main__":
     print(

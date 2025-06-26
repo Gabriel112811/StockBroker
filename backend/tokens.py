@@ -26,7 +26,7 @@ class TokenEndpoint:
         return _generate_and_store_token(conn, None, 'INSTANT_REGISTER', lifespan_seconds=365*24*3600)
 
     @staticmethod
-    def verify_email_token(conn: sqlite3.Connection, token: str) -> int | None:
+    def verify_email_delete_token(conn: sqlite3.Connection, token: str) -> int | None:
         """
         Verifiziert einen E-Mail-Token und gibt bei Erfolg die user_id zurück.
         """
@@ -108,8 +108,6 @@ def _generate_and_store_token(conn: sqlite3.Connection, user_id: int | None, tok
 
 
 def _verify_and_consume_token(conn: sqlite3.Connection, raw_token: str, expected_type: str) -> int | None:
-
-
     result = _verify_but_not_consume_token(conn, raw_token, expected_type)
 
     if not result:
@@ -130,6 +128,8 @@ def _verify_but_not_consume_token(conn: sqlite3.Connection, raw_token: str, expe
     Gibt die user_id bei Erfolg zurück, sonst None.
     """
     hashed_token = _hash_token(raw_token)
+
+    print(raw_token)
 
     cursor = conn.cursor()
 

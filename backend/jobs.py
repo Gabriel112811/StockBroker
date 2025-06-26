@@ -33,7 +33,7 @@ def scheduled_daily_processing_job():
         db = get_db()
         try:
             print("Starte Daily Scheduler")
-            TokenEndpoint.remove_expired_tokens()
+            LeaderboardEndpoint.decimate_entries(db)
             db.commit()
         except Exception as e:
             print(f"[Scheduler] Fehler im Job 'leaderboard_processing_job': {e}")

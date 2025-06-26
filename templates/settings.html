@@ -19,7 +19,8 @@
                     <input type="text" id="ig_link" name="ig_link" class="form-control" placeholder="https://www.instagram.com/dein_name">
                     <div id="ig-link-feedback" style="font-size: 0.9em; margin-top: 5px; height: 1em;"></div>
                 </div>
-                <button type="submit" name="set_ig_link" class="form-button">Speichern</button>
+                {# Hinzugefügt: id="save_ig_link_button" #}
+                <button type="submit" name="set_ig_link" class="form-button" id="save_ig_link_button">Speichern</button>
             </form>
         {% endif %}
     </div>
@@ -62,14 +63,24 @@ document.addEventListener('DOMContentLoaded', function() {
     // --- Instagram Link Validierung (OHNE Verzögerung) ---
     const igLinkInput = document.getElementById('ig_link');
     const igFeedbackEl = document.getElementById('ig-link-feedback');
+    const saveIgLinkButton = document.getElementById('save_ig_link_button'); // NEU: Den Button holen
 
-    if (igLinkInput) {
+    if (igLinkInput && saveIgLinkButton) { // Sicherstellen, dass beide Elemente existieren
+        // Initialer Zustand: Button deaktivieren und ausgrauen, wenn das Eingabefeld leer ist
+        // Dies ist wichtig, da das Feld beim Laden der Seite leer sein könnte.
+        if (igLinkInput.value.trim().length === 0) {
+            saveIgLinkButton.disabled = true;
+            saveIgLinkButton.style.opacity = '0.5'; // Ausgrauen
+        }
+
         igLinkInput.addEventListener('input', () => {
             const link = igLinkInput.value.trim();
 
             if (link.length === 0) {
                 igFeedbackEl.textContent = '';
-                return; // Feld leeren, wenn Eingabe leer ist
+                saveIgLinkButton.disabled = true; // Deaktivieren, wenn Eingabe leer ist
+                saveIgLinkButton.style.opacity = '0.5'; // Ausgrauen
+                return;
             }
 
             fetch(`/check_ig_link?link=${encodeURIComponent(link)}`)
@@ -83,12 +94,24 @@ document.addEventListener('DOMContentLoaded', function() {
                     // Verarbeitet die JSON-Antwort vom Backend
                     igFeedbackEl.textContent = data.message;
                     igFeedbackEl.style.color = data.success ? 'green' : 'red';
+
+                    // NEU: Button-Status basierend auf Validierungsergebnis setzen
+                    if (data.success) {
+                        saveIgLinkButton.disabled = false; // Aktivieren, wenn Link gültig ist
+                        saveIgLinkButton.style.opacity = '1'; // Normale Deckkraft
+                    } else {
+                        saveIgLinkButton.disabled = true; // Deaktivieren, wenn Link ungültig ist
+                        saveIgLinkButton.style.opacity = '0.5'; // Ausgrauen
+                    }
                 })
                 .catch(error => {
                     // Fängt Netzwerkfehler oder JSON-Parse-Fehler ab
                     console.error('Fehler bei der Instagram-Link-Validierung:', error);
                     igFeedbackEl.textContent = 'Prüfung fehlgeschlagen.';
                     igFeedbackEl.style.color = 'red';
+                    // NEU: Button bei Fehler deaktivieren
+                    saveIgLinkButton.disabled = true;
+                    saveIgLinkButton.style.opacity = '0.5';
                 });
         });
     }

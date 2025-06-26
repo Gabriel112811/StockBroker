@@ -8,21 +8,20 @@ Aktienwerte werden über die yfinance-Bibliothek abgefragt.
 
 import sqlite3
 import collections
-import yfinance as yf
-import pandas as pd
 from datetime import datetime, timedelta
-from collections import defaultdict
 
-from backend.accounts_to_database import UTILITIES, ENDPOINT
-
+from backend.accounts_to_database import UTILITIES, ENDPOINT, Settings
 from backend.depot_system import DepotEndpoint
 
+
+link_color = "#e017c0"
 
 class LeaderboardEndpoint:
     """
     Diese Klasse bündelt alle Funktionen, die mit dem Leaderboard interagieren.
     """
 
+    #unused
     @staticmethod
     def get_leaderboard(conn: sqlite3.Connection) -> list[dict]:
         """
@@ -72,7 +71,7 @@ class LeaderboardEndpoint:
         return leaderboard_data
 
     @staticmethod
-    def get_paginated_leaderboard(conn: sqlite3.Connection, page: int = 1, page_size: int = 10) -> list[dict]:
+    def get_paginated_leaderboard(conn: sqlite3.Connection, page: int = 1, page_size: int = 10) -> set[dict]:
         """
         Gibt eine "Seite" des Leaderboards zurück, z.B. die Top 10, oder Platz 11-20.
         Ideal für eine Seitenansicht im Frontend.
@@ -102,8 +101,20 @@ class LeaderboardEndpoint:
         cursor.execute(sql, (page_size, offset))
 
         paginated_data = [dict(row) for row in cursor.fetchall()]
+        user_ids = {i["user_id_fk"] for i in paginated_data}
+        #warum nicht auch mal ein set benutzen, da man es sonst ja nie macht,
+        #wenn man eh keine duplikate will
+        if user_ids:
+            username_map:dict[int, str] = UTILITIES.get_many_usernames(conn, user_ids)
+            link_map:dict[int, str] = Settings.get_many_links(conn, user_ids)
+        else:
+            username_map = {}
+            link_map = {}
+
         for i in paginated_data:
-            i["username"] = UTILITIES.get_username(conn, i["user_id_fk"])
+            i["username"] = username_map.get(i["user_id_fk"])
+            i["link"] = link_map.get(i["user_id_fk"])
+            i["color"] = link_color #ein pink
         conn.row_factory = None
         return paginated_data
 
@@ -180,7 +191,7 @@ class LeaderboardEndpoint:
         sql_query = """
             SELECT id, user_id_fk, last_updated, net_worth
             FROM leaderboard
-            ORDER BY user_id_fk ASC, last_updated DESC;
+            ORDER BY user_id_fk, last_updated DESC;
         """
 
         grouped_data = collections.defaultdict(list)
@@ -206,7 +217,7 @@ class LeaderboardEndpoint:
         return dict(grouped_data)
 
     @staticmethod
-    def decimate_entries(conn:sqlite3.Connection, target:int=250):
+    def decimate_entries(conn:sqlite3.Connection, target:int=500):
         if target < 10:
             return
         all_data = LeaderboardEndpoint.fetch_and_group_leaderboard(conn)
