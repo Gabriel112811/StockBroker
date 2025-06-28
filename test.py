@@ -1,4 +1,5 @@
-x = {"a":1, "b":2}
-y, z = x
+x = [i**2 for i in range(10)]
+y = {i for i in x}
 
-print(y, z)
+print(f"{type(x)} {x}")
+print(f"{type(y)} {y}")

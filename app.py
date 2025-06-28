@@ -9,9 +9,6 @@ import requests
 import sqlite3
 from functools import wraps
 from datetime import datetime, timedelta
-from apscheduler.schedulers.background import BackgroundScheduler
-from pprint import pprint
-
 
 # Lokale Imports
 from backend.accounts_to_database import ENDPOINT as AccountEndpoint, ENDPOINT
@@ -114,16 +111,18 @@ AVAILABLE_QUALITIES = [
     ("high", "Hoch"), ("normal", "Normal"), ("low", "Niedrig")
 ]
 
-def do_login(conn, identifier:str=None , password:str=None, instant_login_result:dict=None):
+def do_login(conn, identifier:str=None , password:str=None, instant_login_result:dict=None) -> bool:
     result = AccountEndpoint.login(conn, identifier, password) if not instant_login_result else instant_login_result
     if result.get('success'):
         session['user_id'] = result.get('user_id')
         session['user_email'] = result.get('email')
         session['username'] = result.get('username')
         flash(result.get('message', 'Login erfolgreich!'), 'success')
-        return redirect(url_for('dashboard_page'))
+        conn.commit()
+        return True
     else:
         flash(result.get('message', 'Login fehlgeschlagen.'), 'error')
+        return False
 
 #--AUTH--
 @app.route('/login', methods=['GET', 'POST'])
@@ -141,8 +140,8 @@ def login_page():
             flash('Bitte Anmeldedaten eingeben.', 'error')
         else:
             conn = get_db()
-            do_login(conn, identifier, password)
-            conn.commit()
+            if do_login(conn, identifier, password):
+                return redirect(url_for('dashboard_page'))
 
     return render_template('auth/login.html', form_data=form_data)
 
@@ -206,8 +205,9 @@ def verify_email_page():
             conn.commit()
             if result.get('success'):
                 user_id = result.get('user_id')
-                do_login(conn, user_id, )
-                flash(result.get('message'), 'success')
+                if do_login(conn, user_id, ):
+                    flash(result.get('message'), 'success')
+                    return redirect(url_for('dashboard_page'))
                 return redirect(url_for('login_page'))
             else:
                 flash(result.get('message'), 'error')
@@ -279,11 +279,9 @@ def reset_password_confirm_page(token):
             conn.commit()
             if result.get('success'):
                 username = UTILITIES.get_username(conn, result["user_id"])
-                do_login(conn, identifier=username, password=new_password)
-                conn.commit() # just to be sure
-
-                flash(result.get('message', 'Passwort erfolgreich geändert.'), 'success')
-
+                if do_login(conn, identifier=username, password=new_password):
+                    flash(result.get('message', 'Passwort erfolgreich geändert.'), 'success')
+                    return redirect(url_for('dashboard_page'))
                 return redirect(url_for('login_page'))
             else:
                 flash(result.get('message', 'Fehler beim Ändern des Passworts.'), 'error')
@@ -440,7 +438,7 @@ def determine_actual_interval_and_period(selected_period, selected_quality):
                            f"auf '{period_display_actual}' angepasst, um Intervall '{actual_interval}' zu unterstützen.")
     return actual_period, actual_interval, adjustment_note
 
-def generate_stock_plotly_chart(ticker_symbol, period="1y", interval="1d", quality_note=None, remove_gaps=True, dark_mode=False):
+def generate_stock_plotly_chart(ticker_symbol, period="1y", interval="1d", quality_note=None, remove_gaps=True, dark_mode=False, show_axis_titles=True, chart_height=None, margin_l=50, margin_r=20, margin_t=80, margin_b=50):
     chart_html = None
     error_msg = quality_note if quality_note else None
     company_name = ticker_symbol
@@ -475,16 +473,21 @@ def generate_stock_plotly_chart(ticker_symbol, period="1y", interval="1d", quali
                                         "3mo": "Quartalsweise"}
             interval_display = interval_map_for_display.get(interval, interval)
 
+            title_text = f'Kurs: {company_name} ({ticker_symbol})<br><span style="font-size:0.8em;">Zeitraum: {period_display}, Auflösung: {interval_display}</span>' if show_axis_titles else ''
+
             fig.update_layout(
-                title=f'Kurs: {company_name} ({ticker_symbol})<br><span style="font-size:0.8em;">Zeitraum: {period_display}, Auflösung: {interval_display}</span>',
-                xaxis_title='Datum / Uhrzeit', yaxis_title='Preis',
+                title=title_text,
+                xaxis_title='Datum / Uhrzeit' if show_axis_titles else '',
+                yaxis_title='Preis' if show_axis_titles else '',
                 xaxis_rangeslider_visible=False,
-                margin=dict(l=50, r=20, t=80, b=50),
+                margin=dict(l=margin_l, r=margin_r, t=margin_t, b=margin_b),
                 paper_bgcolor='rgba(0,0,0,0)',
                 plot_bgcolor='rgba(0,0,0,0)',
                 font=dict(color=font_color),
-                xaxis=dict(gridcolor=grid_color, linecolor=grid_color, zeroline=False),
-                yaxis=dict(gridcolor=grid_color, linecolor=grid_color, zeroline=False)
+                xaxis=dict(gridcolor=grid_color, linecolor=grid_color, zeroline=False, showticklabels=show_axis_titles),
+                yaxis=dict(gridcolor=grid_color, linecolor=grid_color, zeroline=False, showticklabels=True), # Immer Preis-Ticks anzeigen
+                height=chart_height,
+                showlegend=False
             )
 
             if remove_gaps:
@@ -492,7 +495,7 @@ def generate_stock_plotly_chart(ticker_symbol, period="1y", interval="1d", quali
                     fig.update_xaxes(rangebreaks=[dict(bounds=["sat", "mon"])])
                 elif 'm' in interval or 'h' in interval:
                     fig.update_xaxes(rangebreaks=[dict(bounds=["sat", "mon"])])
-            chart_html = fig.to_html(full_html=False, include_plotlyjs='cdn')
+            chart_html = fig.to_html(full_html=False, include_plotlyjs='cdn', config={'displayModeBar': False})
 
     except Exception as e:
         exception_str = str(e)
@@ -509,6 +512,7 @@ def generate_stock_plotly_chart(ticker_symbol, period="1y", interval="1d", quali
         error_msg = (error_msg + " | " if error_msg and error_msg not in current_err else "") + current_err
 
     return chart_html, error_msg, company_name
+
 
 def yfinance_ticker_is_valid(ticker_symbol: str) -> bool:
     """
@@ -591,6 +595,48 @@ def create_portfolio_graph(history_data: list[dict], dark_mode: bool = False, li
     )
     return fig.to_html(full_html=False, include_plotlyjs='cdn', config={'displayModeBar': False})
 
+def get_or_create_widget_chart(conn, ticker, dark_mode):
+    """
+    Holt einen Chart aus dem Cache oder generiert ihn neu.
+    Der Cache ist für 24 Stunden gültig.
+    """
+    cursor = conn.cursor()
+    twenty_four_hours_ago = datetime.now() - timedelta(hours=24)
+
+    # Prüfen, ob ein gültiger Cache-Eintrag existiert
+    cursor.execute("""
+        SELECT chart_html FROM cached_charts 
+        WHERE ticker = ? AND dark_mode = ? AND last_updated > ?
+    """, (ticker, int(dark_mode), twenty_four_hours_ago))
+
+    result = cursor.fetchone()
+    if result:
+        return result[0]  # Gespeichertes HTML zurückgeben
+
+    # Kein gültiger Cache: Chart neu generieren
+    chart_period = "1y"
+    chart_interval = "1d"
+
+    chart_html, _, _ = generate_stock_plotly_chart(
+        ticker,
+        period=chart_period,
+        interval=chart_interval,
+        remove_gaps=True,
+        dark_mode=dark_mode,
+        show_axis_titles=False,
+        chart_height=150,
+        margin_l=0, margin_r=0, margin_t=5, margin_b=5  # Ränder für maximalen Platz
+    )
+
+    if chart_html:
+        # Neuen Chart in der DB speichern (UPSERT: ersetzt alten Eintrag)
+        cursor.execute("""
+            INSERT OR REPLACE INTO cached_charts (ticker, dark_mode, chart_html, last_updated)
+            VALUES (?, ?, ?, ?)
+        """, (ticker, int(dark_mode), chart_html, datetime.now()))
+        conn.commit()
+
+    return chart_html
 
 @app.route('/', methods=['GET'])
 def landing_page():
@@ -647,8 +693,30 @@ def dashboard_page():
 def search_stock_page():
     query = request.args.get('keywords', '').strip()
     results, error = None, None
+    popular_stocks_charts = {}
+
+    conn = get_db()
+    dark_mode_status = g.user_settings and g.user_settings.get('dark_mode')
+
+    popular_stocks = DepotEndpoint.get_most_popular_stocks(conn)
+    if popular_stocks:
+        chart_period = "1y"  # Wird für die Anzeige im Template benötigt
+        period_display_text = next((p[1] for p in AVAILABLE_PERIODS if p[0] == chart_period), chart_period)
+
+        for ticker, total_value in popular_stocks.items():
+            # Caching-Funktion verwenden
+            chart_html = get_or_create_widget_chart(conn, ticker, dark_mode_status)
+
+            basic_info, _ = get_stock_basic_info_yfinance(ticker)
+            popular_stocks_charts[ticker] = {
+                'chart': chart_html,
+                'name': basic_info.get('name', ticker) if basic_info else ticker,
+                'period_display': period_display_text,
+                'total_value': total_value
+            }
 
     if query:
+        # ... (Suchlogik bleibt unverändert)
         if not ALPHA_VANTAGE_API_KEY:
             error = "Suche ist deaktiviert, da der Alpha Vantage API Key fehlt."
         else:
@@ -656,14 +724,21 @@ def search_stock_page():
             if raw_results:
                 results = []
                 for res in raw_results:
-                    # ** NEUE VALIDIERUNG **
                     res['yfinance_valid'] = yfinance_ticker_is_valid(res['1. symbol'])
                     results.append(res)
+                results.sort(key=lambda x: x['yfinance_valid'], reverse=True)
             elif not error:
                 flash(f"Keine Ergebnisse für '{query}' gefunden.", 'info')
+    if error:
+        flash(error, 'error')
 
-    if error: flash(error, 'error')
-    return render_template('search_page.html', query=query, results=results, error=error)
+    return render_template(
+        'search_page.html',
+        query=query,
+        results=results,
+        error=error,
+        popular_stocks_charts=popular_stocks_charts
+    )
 
 
 @app.route('/trade/<string:ticker_symbol>', methods=['GET', 'POST'])

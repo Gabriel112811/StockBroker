@@ -77,3 +77,21 @@ class DepotEndpoint:
             "total_net_worth": total_net_worth,
             "positions": positions_detailed
         }
+
+    @staticmethod
+    def get_most_popular_stocks(conn: sqlite3.Connection) -> dict[str, float]:
+        """
+        Ermittelt die drei beliebtesten Aktien basierend auf dem Gesamtwert über alle Depots.
+        so nice
+        """
+        cursor = conn.cursor()
+        sql_query = """
+                SELECT ticker, SUM(quantity * average_purchase_price) as total_value
+                FROM stock_depot
+                GROUP BY ticker
+                ORDER BY total_value DESC
+                LIMIT 3
+            """
+        cursor.execute(sql_query)
+        popular_stocks = {row[0]: row[1] for row in cursor.fetchall()}
+        return popular_stocks

@@ -176,6 +176,11 @@ class UTILITIES:
             True, wenn der String ein Link zu einem Instagram-Profil ist, sonst False.
         """
         # URLs ohne http/https anfügen, damit urlparse korrekt funktioniert
+        if url is None:
+            result = UTILITIES.get_base_protocol()
+            result.update({"message":"Die URL ist ungültig"})
+            return result
+
         if not url.startswith(('http://', 'https://')):
             url = 'https://' + url
 

@@ -1,0 +1,389 @@
+{% extends "base.html" %}
+
+{% block title %}{{ title }}{% endblock %}
+
+{% block content %}
+<style>
+    /* ------------------------------------------- */
+    /* ---         Hauptlayout & Schrift         --- */
+    /* ------------------------------------------- */
+    .decision-tree-container {
+        text-align: center;
+        padding: 20px 0;
+    }
+    .decision-tree-container h1 { font-size: 2.5em; font-weight: bold; margin-bottom: 25px; }
+    .decision-tree-container h2 {
+        font-size: 1.8em;
+        min-height: 80px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        text-align: center;
+        transition: opacity 0.3s;
+    }
+    .decision-tree-container h2 .emoji { margin-left: 15px; font-size: 1.5em; }
+
+    #answers-container {
+        min-height: 150px;
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        justify-content: center;
+        gap: 15px;
+        padding: 20px 0 120px 0;
+    }
+    #result-container {
+        padding: 40px 20px;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        text-align: center;
+    }
+
+    /* ------------------------------------------- */
+    /* --- Einheitliches Button- & Karten-Styling --- */
+    /* ------------------------------------------- */
+    .dt-button {
+        display: inline-block;
+        padding: 12px 25px;
+        font-size: 1.1em;
+        font-weight: 500;
+        text-align: center;
+        text-decoration: none;
+        color: #333;
+        background-color: #f0f0f0;
+        border: none;
+        border-radius: 12px;
+        box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+        min-width: 120px;
+        cursor: pointer;
+        transition: all 0.15s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+    }
+    .dt-button:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 6px 15px rgba(0,0,0,0.15);
+    }
+    .dt-button.is-loading, .dt-button:active {
+        transform: scale(0.97) translateY(1px);
+        box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        filter: brightness(0.95);
+    }
+    .dt-button-yes { background-color: #28a745; color: white; }
+    .dt-button-no { background-color: #dc3545; color: white; }
+    .dt-button-primary { background-color: #0d6efd; color: white; }
+
+    #result-reveal {
+        background: #0d6efd; color: white; padding: 40px; border-radius: 12px;
+        transition: all 0.15s cubic-bezier(0.25, 0.46, 0.45, 0.94); cursor: pointer;
+    }
+    #result-reveal:hover { transform: translateY(-2px); box-shadow: 0 6px 15px rgba(13,110,253,0.2); }
+    #result-reveal.is-loading, #result-reveal:active { transform: scale(0.97) translateY(1px); box-shadow: 0 2px 5px rgba(13,110,253,0.2); }
+
+    #result-text {
+        font-size: 1.8em;
+        font-weight: bold;
+        color: #212529;
+        margin-top: 20px;
+    }
+    #result-text .emoji {
+        display: block;
+        font-size: 2em;
+        margin-bottom: 15px;
+    }
+
+    /* ------------------------------------------- */
+    /* ---         Spezifische Elemente          --- */
+    /* ------------------------------------------- */
+    .slider-wrapper { width: 100%; max-width: 500px; text-align: center; }
+    .slider-labels { display: flex; justify-content: space-between; font-size: 0.9em; color: #666; padding: 0 10px; }
+    .slider-feedback { font-size: 1.2em; font-weight: 600; color: #0d6efd; height: 30px; margin-top: 10px; }
+    input[type="range"] {
+        -webkit-appearance: none; appearance: none;
+        width: 100%; height: 8px; background: #ddd; border-radius: 5px;
+        outline: none; transition: opacity 0.2s; margin-top: 15px;
+    }
+    input[type="range"]::-webkit-slider-thumb {
+        -webkit-appearance: none; appearance: none;
+        width: 24px; height: 24px; background: #0d6efd;
+        border-radius: 50%; cursor: pointer; border: 3px solid white;
+        box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+    }
+    input[type="range"]::-moz-range-thumb { /* Firefox */
+        width: 24px; height: 24px; background: #0d6efd;
+        border-radius: 50%; cursor: pointer; border: 3px solid white;
+        box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+    }
+
+    /* Footer & Baum-Ansicht */
+    .progress-bar-footer { display: flex; justify-content: space-between; align-items: center; width: 100%; background-color: #ffffff; box-shadow: 0 -2px 5px rgba(0,0,0,0.05); padding: 10px 25px; position: fixed; bottom: 0; left: 0; z-index: 100; box-sizing: border-box; }
+    #tree-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(240, 242, 245, 0.95); backdrop-filter: blur(5px); z-index: 200; display: none; overflow: auto; }
+    #tree-viewer { max-width: 1200px; margin: 40px auto; background: white; padding: 30px; border-radius: 12px; box-shadow: 0 10px 30px rgba(0,0,0,0.1); text-align: left; }
+    #tree-viewer h2 { text-align: center; margin-bottom: 20px; }
+    #tree-viewer-content { list-style: none; padding-left: 20px; font-family: 'Courier New', Courier, monospace; }
+    #tree-viewer-content ul { list-style: none; padding-left: 30px; }
+    #tree-viewer-content li { position: relative; padding-top: 5px; padding-bottom: 5px; }
+    #tree-viewer-content li::before { content: ''; position: absolute; top: 0; left: -20px; border-left: 1px solid #ccc; width: 1px; height: 100%; }
+    #tree-viewer-content li:last-child::before { height: 1em; }
+    #tree-viewer-content li::after { content: ''; position: absolute; top: 1em; left: -20px; border-top: 1px solid #ccc; width: 15px; height: 1px; }
+    .tree-question { font-weight: bold; color: #333; cursor: pointer; }
+    .tree-question:hover { color: #0d6efd; text-decoration: underline; }
+    .tree-answer { font-style: italic; color: #0d6efd; }
+    .tree-result { color: #28a745; font-weight: bold; }
+</style>
+
+<div class="content-container">
+    <div id="decision-tree-area" class="decision-tree-container">
+        <div id="start-view">
+            <h1>{{ title }}</h1>
+            <button id="start-btn" class="dt-button dt-button-primary" style="font-size: 1.5em; padding: 15px;">Finde es heraus!</button>
+        </div>
+        <div id="qa-view" style="display: none;">
+            <h2 id="question-text"></h2>
+            <div id="answers-container"></div>
+        </div>
+        <div id="result-view" style="display: none;">
+            <div id="result-container">
+                <h3>Dein perfektes Ergebnis!</h3>
+                <div id="result-reveal">
+                    <span class="reveal-text">Klicke hier, um es aufzudecken!</span>
+                </div>
+                <div id="result-text" style="display: none;"></div>
+                <button id="restart-btn" class="dt-button" style="margin-top: 30px;">Von vorne beginnen</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<footer class="progress-bar-footer">
+    <button id="show-tree-btn" class="form-button">Ganzen Baum anzeigen</button>
+    <div id="progress-container"><span>Start...</span></div>
+</footer>
+<div id="tree-overlay">
+    <div id="tree-viewer">
+        <h2>Gesamter Entscheidungsbaum</h2>
+        <ul id="tree-viewer-content"></ul>
+        <button id="close-tree-btn" class="form-button" style="display: block; margin: 20px auto 0;">Zurück zur Frage</button>
+    </div>
+</div>
+{% endblock %}
+
+
+{% block scripts %}
+<script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.9.3/dist/confetti.browser.min.js"></script>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const decisionTree = JSON.parse('{{ tree_json | safe }}');
+    const sliderPresets = {
+        'geduldig_hektisch': { min: 'Zen', max: 'Panik', steps: ['Tiefenentspannt', 'Geduldig', 'Fokussiert', 'Gestresst', 'PANIK!'] },
+        'stabil_hip': { min: 'Bewährt', max: 'Brandneu', steps: ['Steinalt', 'Stabil', 'Modern', 'Top-aktuell', 'Alpha-Version'] }
+    };
+    const qaView = document.getElementById('qa-view'), startView = document.getElementById('start-view'),
+          resultView = document.getElementById('result-view'), questionText = document.getElementById('question-text'),
+          answersContainer = document.getElementById('answers-container'), resultReveal = document.getElementById('result-reveal'),
+          resultText = document.getElementById('result-text'), progressContainer = document.getElementById('progress-container'),
+          treeOverlay = document.getElementById('tree-overlay'), treeViewerContent = document.getElementById('tree-viewer-content');
+
+    let currentNode = decisionTree, history = [];
+
+    const eventHandlers = {
+        start: () => {
+            startView.style.display = 'none';
+            qaView.style.display = 'block';
+            displayNode(currentNode);
+        },
+        restart: () => window.location.reload(),
+        showTree: () => {
+            treeViewerContent.innerHTML = '';
+            renderFullTree(decisionTree, treeViewerContent, []);
+            treeOverlay.style.display = 'block';
+        },
+        closeTree: () => treeOverlay.style.display = 'none',
+        jumpToNode: (e) => {
+            if (e.target.classList.contains('tree-question')) {
+                const path = JSON.parse(e.target.dataset.path || '[]');
+                if (path) jumpToNode(path);
+            }
+        },
+        answer: (e) => {
+            const target = e.target;
+            if (target.classList.contains('dt-button')) {
+                target.classList.add('is-loading');
+                if (target.dataset.answer) {
+                    handleAnswer(target.dataset.answer);
+                } else {
+                    const slider = answersContainer.querySelector('input[type="range"]');
+                    const feedbackLabel = answersContainer.querySelector('.slider-feedback');
+                    const value = parseInt(slider.value, 10);
+                    let answerKey;
+                    if (value === 0) answerKey = '0%';
+                    else if (value >= 1 && value <= 50) answerKey = '1%-50%';
+                    else if (value >= 51 && value <= 99) answerKey = '51%-99%';
+                    else if (value === 100) answerKey = '100%';
+                    handleAnswer(answerKey, feedbackLabel.textContent);
+                }
+            }
+        },
+        reveal: () => {
+            resultReveal.classList.add('is-loading');
+            confetti({ particleCount: 150, spread: 90, origin: { y: 0.6 } });
+            setTimeout(() => {
+                resultReveal.style.display = 'none';
+                resultText.style.display = 'block';
+            }, 300);
+        }
+    };
+
+    document.getElementById('start-btn').addEventListener('click', eventHandlers.start);
+    document.getElementById('restart-btn').addEventListener('click', eventHandlers.restart);
+    document.getElementById('show-tree-btn').addEventListener('click', eventHandlers.showTree);
+    document.getElementById('close-tree-btn').addEventListener('click', eventHandlers.closeTree);
+    treeViewerContent.addEventListener('click', eventHandlers.jumpToNode);
+    answersContainer.addEventListener('click', eventHandlers.answer);
+    resultReveal.addEventListener('click', eventHandlers.reveal);
+
+    function handleAnswer(answerKey, displayAnswer = null) {
+        let historyAnswerText = displayAnswer || (answerKey === 'True' ? 'Ja' : answerKey === 'False' ? 'Nein' : answerKey);
+        history.push({ question: currentNode.kurz_frage || currentNode.frage, answer: historyAnswerText });
+        const nextNode = currentNode.antworten[answerKey];
+        setTimeout(() => {
+            currentNode = nextNode;
+            displayNode(currentNode);
+        }, 300);
+    }
+
+    function jumpToNode(path) {
+        let tempNode = decisionTree;
+        history = [];
+        for (const answerKey of path) {
+            let displayAnswer = answerKey === 'True' ? 'Ja' : (answerKey === 'False' ? 'Nein' : answerKey);
+            if (tempNode.type === 'slider') {
+                 const preset = sliderPresets[tempNode.preset];
+                 if(preset) {
+                    let value;
+                    if (answerKey === '0%') value = 0; else if (answerKey === '1%-50%') value = 25;
+                    else if (answerKey === '51%-99%') value = 75; else if (answerKey === '100%') value = 100;
+                    const stepIndex = Math.floor(value / (101 / preset.steps.length));
+                    displayAnswer = preset.steps[Math.min(stepIndex, preset.steps.length - 1)];
+                 }
+            }
+            history.push({ question: tempNode.kurz_frage || tempNode.frage, answer: displayAnswer });
+            tempNode = tempNode.antworten[answerKey];
+        }
+        currentNode = tempNode;
+        treeOverlay.style.display = 'none';
+        startView.style.display = 'none';
+        resultView.style.display = 'none';
+        qaView.style.display = 'block';
+        displayNode(currentNode);
+    }
+
+    function displayNode(node) {
+        updateProgress();
+        qaView.style.opacity = 0;
+        setTimeout(() => {
+            if (typeof node === 'string') {
+                displayResult(node);
+                return;
+            }
+            const emojiSpan = node.emoji ? `<span class="emoji">${node.emoji}</span>` : '';
+            questionText.innerHTML = node.frage + emojiSpan;
+            answersContainer.innerHTML = '';
+            if (node.type === 'slider') renderSlider(node);
+            else renderButtons(node);
+            qaView.style.opacity = 1;
+        }, 200);
+    }
+
+    function renderButtons(node) {
+        for (const answerKey in node.antworten) {
+            const button = document.createElement('button');
+            button.className = 'dt-button';
+            let answerText = answerKey;
+            if (answerKey === 'True') { answerText = 'Ja'; button.classList.add('dt-button-yes'); }
+            else if (answerKey === 'False') { answerText = 'Nein'; button.classList.add('dt-button-no'); }
+            button.textContent = answerText;
+            button.dataset.answer = answerKey;
+            answersContainer.appendChild(button);
+        }
+    }
+
+    function renderSlider(node) {
+        const preset = sliderPresets[node.preset];
+        if (!preset) return;
+        const wrapper = document.createElement('div');
+        wrapper.className = 'slider-wrapper';
+        const feedbackLabel = document.createElement('div');
+        feedbackLabel.className = 'slider-feedback';
+        const slider = document.createElement('input');
+        slider.type = 'range'; slider.min = 0; slider.max = 100; slider.value = 50;
+        const labels = document.createElement('div');
+        labels.className = 'slider-labels';
+        labels.innerHTML = `<span>${preset.min}</span><span>${preset.max}</span>`;
+        function updateFeedback() {
+            const value = parseInt(slider.value, 10);
+            const stepIndex = Math.floor(value / (101 / preset.steps.length));
+            feedbackLabel.textContent = preset.steps[Math.min(stepIndex, preset.steps.length - 1)];
+        }
+        slider.addEventListener('input', updateFeedback);
+
+        const continueBtn = document.createElement('button');
+        continueBtn.className = 'dt-button dt-button-primary';
+        continueBtn.textContent = 'Weiter';
+        continueBtn.style.marginTop = '20px';
+
+        wrapper.appendChild(feedbackLabel);
+        wrapper.appendChild(slider);
+        wrapper.appendChild(labels);
+
+        answersContainer.appendChild(wrapper);
+        answersContainer.appendChild(continueBtn);
+        updateFeedback();
+    }
+
+    function displayResult(result) {
+        qaView.style.display = 'none';
+        resultView.style.display = 'block';
+        const emojiMatch = result.match(/(\p{Emoji})/u);
+        const emoji = emojiMatch ? `<span class="emoji">${emojiMatch[0]}</span>` : '';
+        const text = result.replace(/(\p{Emoji})/u, '').trim();
+        resultText.innerHTML = emoji + text;
+    }
+
+    function updateProgress() {
+        progressContainer.innerHTML = '';
+        if (history.length === 0) {
+            progressContainer.innerHTML = '<span>Start...</span>';
+            return;
+        }
+        history.forEach((item, index) => {
+            if (index > 0) progressContainer.innerHTML += ' <span class="arrow">&rarr;</span> ';
+            progressContainer.innerHTML += `<span class="q-node" title="${item.question}">${item.question}</span> <span class="arrow">&rarr;</span> <span class="a-node">${item.answer}</span>`;
+        });
+    }
+
+    function renderFullTree(node, parentElement, path) {
+        if (typeof node === 'string') {
+            parentElement.appendChild(document.createElement('li')).innerHTML = `<span class="tree-result">${node}</span>`;
+            return;
+        }
+        const li = document.createElement('li');
+        const questionSpan = document.createElement('span');
+        questionSpan.className = 'tree-question';
+        questionSpan.textContent = `${node.emoji || ''} ${node.frage}`;
+        questionSpan.dataset.path = JSON.stringify(path);
+        li.appendChild(questionSpan);
+        const ul = document.createElement('ul');
+        for (const answerKey in node.antworten) {
+            const answerLi = document.createElement('li');
+            let answerText = answerKey === 'True' ? 'Ja' : (answerKey === 'False' ? 'Nein' : answerKey);
+            answerLi.innerHTML = `<span class="tree-answer">Antwort: "${answerText}"</span>`;
+            renderFullTree(node.antworten[answerKey], answerLi, [...path, answerKey]);
+            ul.appendChild(answerLi);
+        }
+        li.appendChild(ul);
+        parentElement.appendChild(li);
+    }
+});
+</script>
+{% endblock %}
