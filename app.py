@@ -100,7 +100,7 @@ def cancel_order_route(order_id):
 
 # -- Konstanten für Dropdown-Optionen beim Graph --
 AVAILABLE_PERIODS = [
-    ("5d", "5 Tage"), ("1mo", "1 Monat"), ("3mo", "3 Monate"),
+    ("5d", "5 Tage"), ("1mo", "1 Monat"), ("2mo", "2 Monate"),
     ("6mo", "6 Monate"), ("1y", "1 Jahr"), ("2y", "2 Jahre"),
     ("5y", "5 Jahre"), ("ytd", "Seit Jahresbeginn"), ("max", "Maximal")
 ]
@@ -393,10 +393,10 @@ def determine_actual_interval_and_period(selected_period, selected_quality):
         if selected_quality == "high": actual_interval = "5m"
         elif selected_quality == "normal": actual_interval = "30m"
         else: actual_interval = "1h"
-    elif selected_period == "3mo":
-        if selected_quality == "high": actual_interval = "30m"
-        elif selected_quality == "normal": actual_interval = "1h"
-        else: actual_interval = "1d"
+    elif selected_period == "2mo":
+        if selected_quality == "high": actual_interval = "15m"  # Beste Qualität für 60 Tage
+        elif selected_quality == "normal": actual_interval = "30m"
+        else: actual_interval = "1h"
     elif selected_period in ["6mo", "ytd"]:
         if selected_quality == "high": actual_interval = "1h"
         elif selected_quality == "normal": actual_interval = "1d"
@@ -419,9 +419,11 @@ def determine_actual_interval_and_period(selected_period, selected_quality):
     if actual_interval == "1m" and actual_period not in ["1d", "2d", "3d", "4d", "5d", "7d"]: # Max 7d for 1m data
         actual_period = "5d" # Sicherer Standard für 1 m
     # Für Intervalle <60m: Daten sind für die letzten 60 Tage verfügbar
-    elif actual_interval in ["2m", "5m", "15m", "30m"] and actual_period not in ["1d", "5d", "1mo", "2mo", "60d"]:
-         if selected_period == "3mo" or selected_period == "6mo": actual_period = "2mo" # yf max 60d
-         elif selected_period not in ["1d", "5d", "1mo"]: actual_period = "2mo" # yf max 60d
+    elif actual_interval in ["2m", "5m", "15m", "30m"]:
+        # Wenn der ausgewählte Zeitraum länger als 60 Tage ist, wird er auf 60 Tage angepasst.
+        # Gültige Perioden für diese Intervalle sind z.B. 1d, 5d, 1mo, 60d.
+        if selected_period not in ["1d", "5d", "1mo", "60d"]:
+             actual_period = "60d" # yf max 60d
     # Für stündliche Intervalle (1h, 60m, 90m): Daten sind für die letzten 730 Tage (ca. 2 Jahre) verfügbar
     elif actual_interval in ["60m", "90m", "1h"] and actual_period not in ["1d", "5d", "1mo", "3mo", "6mo", "1y", "2y", "ytd", "730d"]:
         if selected_period in ["5y", "max"]: actual_period = "2y" # yf max 730d
