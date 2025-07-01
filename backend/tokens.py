@@ -129,8 +129,6 @@ def _verify_but_not_consume_token(conn: sqlite3.Connection, raw_token: str, expe
     """
     hashed_token = _hash_token(raw_token)
 
-    print(raw_token)
-
     cursor = conn.cursor()
 
     sql_find = "SELECT id, user_id_fk, expires_at FROM secure_tokens WHERE token_hash = ? AND token_type = ?"

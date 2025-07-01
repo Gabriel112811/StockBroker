@@ -436,9 +436,7 @@ def determine_actual_interval_and_period(selected_period, selected_quality):
                            f"auf '{period_display_actual}' angepasst, um Intervall '{actual_interval}' zu unterstützen.")
     return actual_period, actual_interval, adjustment_note
 
-def generate_stock_plotly_chart(ticker_symbol, period="1y", interval="1d", quality_note=None, remove_gaps=True,
-                                dark_mode=False, show_axis_titles=True, chart_height=None, chart_width=None,
-                                margin_l=50, margin_r=20, margin_t=80, margin_b=50):
+def generate_stock_plotly_chart(ticker_symbol, period="1y", interval="1d", quality_note=None, remove_gaps=True, dark_mode=False, show_axis_titles=True, chart_height=None, margin_l=50, margin_r=20, margin_t=80, margin_b=50):
     chart_html = None
     error_msg = quality_note if quality_note else None
     company_name = ticker_symbol
@@ -481,8 +479,7 @@ def generate_stock_plotly_chart(ticker_symbol, period="1y", interval="1d", quali
                 "zeroline": False, "showticklabels": True
             }
             if not show_axis_titles:  # Dies ist ein Widget
-                # yaxis_settings["automargin"] = True # Deaktiviert für konsistente Widget-Größen
-                pass
+                yaxis_settings["automargin"] = True
 
             fig.update_layout(
                 title=title_text,
@@ -496,7 +493,6 @@ def generate_stock_plotly_chart(ticker_symbol, period="1y", interval="1d", quali
                 xaxis=dict(gridcolor=grid_color, linecolor=grid_color, zeroline=False, showticklabels=False),
                 yaxis=yaxis_settings,
                 height=chart_height,
-                width=chart_width,
                 showlegend=False
             )
 
@@ -560,6 +556,7 @@ def yfinance_ticker_is_valid(ticker_symbol: str) -> bool:
         # dass der Ticker nicht gültig ist.
         return False
 
+
 def create_portfolio_graph(history_data: list[dict], dark_mode: bool = False, line_strength:int=4) -> str | None:
     if not history_data or len(history_data) < 2:
         return None
@@ -616,27 +613,26 @@ def create_portfolio_graph(history_data: list[dict], dark_mode: bool = False, li
     return fig.to_html(full_html=False, include_plotlyjs='cdn', config={'displayModeBar': False})
 
 
-def get_or_create_widget_chart(conn, ticker, dark_mode):
+def get_or_generate_widget_chart(conn, ticker: str, dark_mode: bool) -> str | None:
     """
-    Holt einen Chart aus dem Cache oder generiert ihn neu.
-    Die Ränder sind für die Widget-Ansicht optimiert.
+    Prüft den Cache. Wenn kein gültiger Chart vorhanden ist, wird er generiert, 
+    gespeichert und zurückgegeben.
     """
     cursor = conn.cursor()
     twenty_four_hours_ago = datetime.now() - timedelta(hours=24)
-
     dark_mode_int = int(dark_mode) if dark_mode is not None else 0
 
+    # 1. Cache prüfen
     cursor.execute("""
         SELECT chart_html FROM cached_charts 
         WHERE ticker = ? AND dark_mode = ? AND last_updated > ?
     """, (ticker, dark_mode_int, twenty_four_hours_ago))
-
     result = cursor.fetchone()
     if result:
         return result[0]
 
-    # Chart neu generieren mit festen Widget-Einstellungen
-    chart_html, _, _ = generate_stock_plotly_chart(
+    # 2. Wenn nicht im Cache: Generieren, speichern und zurückgeben
+    chart_html, error_msg, _ = generate_stock_plotly_chart(
         ticker_symbol=ticker,
         period="1y",
         interval="1d",
@@ -644,21 +640,39 @@ def get_or_create_widget_chart(conn, ticker, dark_mode):
         dark_mode=dark_mode,
         show_axis_titles=False,
         chart_height=150,
-        chart_width=10, # Feste Breite für Widgets
-        margin_l=40,  # Fester linker Rand statt automargin
-        margin_r=0,
-        margin_t=5,
-        margin_b=5
+        margin_l=0, margin_r=0, margin_t=5, margin_b=5
     )
 
-    if chart_html:
+    if chart_html and not error_msg:
         cursor.execute("""
             INSERT OR REPLACE INTO cached_charts (ticker, dark_mode, chart_html, last_updated)
-            VALUES (?, ?, ?, ?)""",
-                       (ticker, dark_mode_int, chart_html, datetime.now()))
+            VALUES (?, ?, ?, ?)
+        """, (ticker, dark_mode_int, chart_html, datetime.now()))
         conn.commit()
+        return chart_html
+    elif error_msg:
+        print(f"[Chart-Gen] Fehler beim Generieren des Charts für {ticker}: {error_msg}")
+        return None
+    return None
 
-    return chart_html
+def update_popular_charts_cache(conn):
+    """
+    Holt die beliebtesten Aktien und aktualisiert proaktiv deren Charts im Cache 
+    für beide Modi (hell und dunkel).
+    """
+    print("[Cache-Job] Starte proaktives Update der beliebten Charts...")
+    popular_stocks = DepotEndpoint.get_most_popular_stocks(conn)
+    if not popular_stocks:
+        print("[Cache-Job] Keine beliebten Aktien zum Aktualisieren gefunden.")
+        return
+
+    for ticker in popular_stocks.keys():
+        print(f"[Cache-Job] Aktualisiere Cache für Ticker: {ticker}")
+        # Cache für beide Modi füllen
+        get_or_generate_widget_chart(conn, ticker, dark_mode=True)
+        get_or_generate_widget_chart(conn, ticker, dark_mode=False)
+    print("[Cache-Job] Proaktives Update abgeschlossen.")
+
 
 @app.route('/', methods=['GET'])
 def landing_page():
@@ -726,7 +740,7 @@ def search_stock_page():
         period_display_text = next((p[1] for p in AVAILABLE_PERIODS if p[0] == chart_period), chart_period)
 
         for ticker, total_value in popular_stocks.items():
-            chart_html = get_or_create_widget_chart(conn, ticker, dark_mode_status)
+            chart_html = get_or_generate_widget_chart(conn, ticker, dark_mode_status)
             basic_info, _ = get_stock_basic_info_yfinance(ticker)
             popular_stocks_charts[ticker] = {
                 'chart': chart_html,
@@ -751,8 +765,6 @@ def search_stock_page():
 
         if error:
             flash(error, 'error')
-
-    print(popular_stocks_charts)
 
     return render_template(
             'search_page.html',

@@ -1,4 +1,4 @@
-from app import app, get_db
+from app import app, get_db, update_popular_charts_cache
 from backend.trading import TradingEndpoint
 from backend.leaderboard import LeaderboardEndpoint
 from backend.tokens import TokenEndpoint
@@ -37,6 +37,8 @@ def scheduled_daily_processing_job():
             LeaderboardEndpoint.decimate_entries(db)
             result = AccountEndpoint.delete_unverified_users(db)
             print(result.get("message"))
+            # Proaktives Caching der beliebten Charts
+            update_popular_charts_cache(db)
             db.commit()
         except Exception as e:
             print(f"[Scheduler] Fehler im Job 'leaderboard_processing_job': {e}")
