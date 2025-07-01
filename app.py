@@ -491,10 +491,15 @@ def generate_stock_plotly_chart(ticker_symbol, period="1y", interval="1d", quali
             )
 
             if remove_gaps:
+                # Lücken für Wochenenden bei täglichen, wöchentlichen, etc. Intervallen entfernen
                 if interval in ["1d", "1wk", "1mo", "3mo"]:
                     fig.update_xaxes(rangebreaks=[dict(bounds=["sat", "mon"])])
+                # Lücken für Wochenenden UND Nächte bei Intraday-Intervallen entfernen
                 elif 'm' in interval or 'h' in interval:
-                    fig.update_xaxes(rangebreaks=[dict(bounds=["sat", "mon"])])
+                    fig.update_xaxes(rangebreaks=[
+                        dict(bounds=["sat", "mon"]),  # Wochenenden
+                        dict(pattern="hour", bounds=[16, 9.5])  # Außerhalb der US-Handelszeiten (angenommen)
+                    ])
             chart_html = fig.to_html(full_html=False, include_plotlyjs='cdn', config={'displayModeBar': False})
 
     except Exception as e:
@@ -832,8 +837,8 @@ def stock_detail_page(ticker_symbol):
 
     selected_period = request.args.get('period', '1y')
     selected_quality = request.args.get('quality', 'normal')
-    remove_gaps_str = request.args.get('remove_gaps', 'on')
-    remove_gaps_bool = remove_gaps_str == 'on'
+    # Eine Checkbox ist nur in den request.args, wenn sie angehakt ist.
+    remove_gaps_bool = 'remove_gaps' in request.args
 
     if not any(p[0] == selected_period for p in AVAILABLE_PERIODS): selected_period = '1y'
     if not any(q[0] == selected_quality for q in AVAILABLE_QUALITIES): selected_quality = 'normal'
