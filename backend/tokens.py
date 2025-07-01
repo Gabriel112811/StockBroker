@@ -92,7 +92,7 @@ def _generate_and_store_token(conn: sqlite3.Connection, user_id: int | None, tok
     length = 8 if lifespan_seconds <= 1000 else 20
     raw_token = _generate_token(length=length)
     hashed_token = _hash_token(raw_token)
-
+    print(raw_token)
     now = datetime.now()
     expires = now + timedelta(seconds=lifespan_seconds)
 
@@ -102,7 +102,7 @@ def _generate_and_store_token(conn: sqlite3.Connection, user_id: int | None, tok
     """
     cursor = conn.cursor()
     cursor.execute(sql, (user_id, hashed_token, token_type, expires))
-
+    conn.commit()
     # Der rohe Token wird nur einmal zurückgegeben und niemals gespeichert!
     return raw_token
 

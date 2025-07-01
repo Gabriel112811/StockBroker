@@ -36,11 +36,13 @@ class DepotEndpoint:
         portfolio_value = 0.0
         positions_detailed = []
 
+        prices_not_complete = not tickers
+
         # 3. Aktuelle Kurse für alle Ticker im Depot abfragen (falls vorhanden)
         if tickers:
             try:
                 # Batch-Download für bessere Performance
-                data = yf.download(tickers, period="1d", progress=False, group_by='ticker')
+                data = yf.download(tickers, period="1d", progress=False, group_by='ticker', auto_adjust=True)
 
                 for ticker, quantity, avg_price in positions_raw:
                     current_price = None
@@ -48,6 +50,8 @@ class DepotEndpoint:
                     if not data.empty and ticker in data and not pd.isna(data[ticker]['Close'].iloc[-1]):
                         current_price = data[ticker]['Close'].iloc[-1]
                         current_value = quantity * current_price
+                        if current_value is None:
+                            prices_not_complete = True
                         portfolio_value += current_value
 
                     positions_detailed.append({
@@ -75,7 +79,8 @@ class DepotEndpoint:
             "cash_balance": cash_balance,
             "portfolio_value": portfolio_value,
             "total_net_worth": total_net_worth,
-            "positions": positions_detailed
+            "positions": positions_detailed,
+            "prices_not_complete": prices_not_complete,
         }
 
     @staticmethod

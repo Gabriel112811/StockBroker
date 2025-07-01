@@ -56,11 +56,16 @@ def get_db():
 # if name is main gezwungene alternative
 with app.app_context():
     local_conn = get_db()
+    #result = AccountEndpoint.create_account(local_conn, "abcdef", "fanvielerdinge@gmail.com", "lkjsadfjashdf",)
+    #print(result)
+    #result = AccountEndpoint.verify_email_delete_token(local_conn, "tDpH8yzRfms")
+    #print(result)
     #pprint(LeaderboardEndpoint.decimate_entries(conn))
     #pprint(LeaderboardEndpoint.decimate_entries(conn))
 
     #conn.commit()
     local_conn.close()
+    #exit() #l 222 account management löschen
 
 @app.teardown_appcontext
 def close_connection(exception):
@@ -116,7 +121,10 @@ def do_login(conn, identifier:str=None , password:str=None, instant_login_result
     if result.get('success'):
         session['user_id'] = result.get('user_id')
         session['user_email'] = result.get('email')
-        session['username'] = result.get('username')
+        if result.get('username') is None:
+            session['username'] = UTILITIES.get_username(conn, result.get('user_id'))
+        else:
+            session['username'] = result.get('username')
         flash(result.get('message', 'Login erfolgreich!'), 'success')
         conn.commit()
         return True
@@ -156,7 +164,7 @@ def register_page():
         username = request.form.get('username', '').strip()
         password = request.form.get('password', '').strip()
         password_confirm = request.form.get('password_confirm', '').strip()
-        instant_token = request.form.get('instant_register_token', '').strip()  # NEU
+        instant_token = request.form.get('instant_register_token', '').strip()
 
         form_data['email'] = email
         form_data['username'] = username
@@ -167,13 +175,11 @@ def register_page():
             flash('Die Passwörter stimmen nicht überein.', 'error')
         else:
             conn = get_db()
-            # NEU: instant_token wird übergeben
             result = AccountEndpoint.create_account(conn, password, email, username,
                                                     instant_register_token=instant_token)
 
             if result.get('success'):
                 conn.commit()
-                # NEU: Prüfen, ob eine Verifizierung nötig ist
                 if result.get('email_verification_required'):
                     # Leite auf eine Seite weiter, die den User anweist, seine E-Mails zu prüfen
                     flash(result.get('message'), 'info')
@@ -200,31 +206,29 @@ def verify_email_page():
         if not token:
             flash('Bitte gib den Code aus der E-Mail ein.', 'error')
         else:
-            conn = get_db()
-            result = AccountEndpoint.verify_email_delete_token(conn, token)
-            conn.commit()
-            if result.get('success'):
-                user_id = result.get('user_id')
-                if do_login(conn, user_id, ):
-                    flash(result.get('message'), 'success')
-                    return redirect(url_for('dashboard_page'))
-                return redirect(url_for('login_page'))
-            else:
-                flash(result.get('message'), 'error')
-
+            if do_email_token_verification(token):
+                return redirect(url_for('dashboard_page'))
     return render_template('auth/verify_email.html')
 
 @app.route('/verify/<token>')
-def verify_email_from_link(token):
+def verify_email_from_link(token) -> redirect:
     """Verarbeitet den Token direkt aus dem E-Mail-Link."""
+    if do_email_token_verification(token):
+        return redirect(url_for('dashboard_page'))
+    else:
+        return redirect(url_for('register_page'))
+
+def do_email_token_verification(token) -> bool:
     conn = get_db()
     result = AccountEndpoint.verify_email_delete_token(conn, token)
+    conn.commit()
     if result.get('success'):
-        conn.commit()
-        flash(result.get('message'), 'success')
+        user_id = result.get('user_id')
+        if do_login(conn, UTILITIES.get_username(conn, user_id), instant_login_result=result):
+            return True
     else:
         flash(result.get('message'), 'error')
-    return redirect(url_for('login_page'))
+    return False
 
 @app.route('/logout')
 def logout():
@@ -480,12 +484,14 @@ def generate_stock_plotly_chart(ticker_symbol, period="1y", interval="1d", quali
                 xaxis_title='Datum / Uhrzeit' if show_axis_titles else '',
                 yaxis_title='Preis' if show_axis_titles else '',
                 xaxis_rangeslider_visible=False,
+                # Diese Zeile wird angepasst
                 margin=dict(l=margin_l, r=margin_r, t=margin_t, b=margin_b),
                 paper_bgcolor='rgba(0,0,0,0)',
                 plot_bgcolor='rgba(0,0,0,0)',
                 font=dict(color=font_color),
-                xaxis=dict(gridcolor=grid_color, linecolor=grid_color, zeroline=False, showticklabels=show_axis_titles),
-                yaxis=dict(gridcolor=grid_color, linecolor=grid_color, zeroline=False, showticklabels=True), # Immer Preis-Ticks anzeigen
+                xaxis=dict(gridcolor=grid_color, linecolor=grid_color, zeroline=False, showticklabels=False),
+                # X-Achsen-Labels ausblenden
+                yaxis=dict(gridcolor=grid_color, linecolor=grid_color, zeroline=False, showticklabels=True),
                 height=chart_height,
                 showlegend=False
             )
@@ -595,15 +601,18 @@ def create_portfolio_graph(history_data: list[dict], dark_mode: bool = False, li
     )
     return fig.to_html(full_html=False, include_plotlyjs='cdn', config={'displayModeBar': False})
 
-def get_or_create_widget_chart(conn, ticker, dark_mode):
+
+def get_or_create_widget_chart(conn, ticker, dark_mode, **kwargs):
     """
     Holt einen Chart aus dem Cache oder generiert ihn neu.
-    Der Cache ist für 24 Stunden gültig.
+    Akzeptiert jetzt zusätzliche Keyword-Argumente für die Chart-Generierung.
     """
     cursor = conn.cursor()
     twenty_four_hours_ago = datetime.now() - timedelta(hours=24)
 
-    # Prüfen, ob ein gültiger Cache-Eintrag existiert
+    if dark_mode is None:
+        dark_mode = 0
+
     cursor.execute("""
         SELECT chart_html FROM cached_charts 
         WHERE ticker = ? AND dark_mode = ? AND last_updated > ?
@@ -611,9 +620,8 @@ def get_or_create_widget_chart(conn, ticker, dark_mode):
 
     result = cursor.fetchone()
     if result:
-        return result[0]  # Gespeichertes HTML zurückgeben
+        return result[0]
 
-    # Kein gültiger Cache: Chart neu generieren
     chart_period = "1y"
     chart_interval = "1d"
 
@@ -625,11 +633,10 @@ def get_or_create_widget_chart(conn, ticker, dark_mode):
         dark_mode=dark_mode,
         show_axis_titles=False,
         chart_height=150,
-        margin_l=0, margin_r=0, margin_t=5, margin_b=5  # Ränder für maximalen Platz
+        **kwargs
     )
 
     if chart_html:
-        # Neuen Chart in der DB speichern (UPSERT: ersetzt alten Eintrag)
         cursor.execute("""
             INSERT OR REPLACE INTO cached_charts (ticker, dark_mode, chart_html, last_updated)
             VALUES (?, ?, ?, ?)
@@ -700,12 +707,20 @@ def search_stock_page():
 
     popular_stocks = DepotEndpoint.get_most_popular_stocks(conn)
     if popular_stocks:
-        chart_period = "1y"  # Wird für die Anzeige im Template benötigt
+        chart_period = "1y"
         period_display_text = next((p[1] for p in AVAILABLE_PERIODS if p[0] == chart_period), chart_period)
 
         for ticker, total_value in popular_stocks.items():
-            # Caching-Funktion verwenden
-            chart_html = get_or_create_widget_chart(conn, ticker, dark_mode_status)
+            # HIER IST DIE ANPASSUNG: Präzise Ränder für die Widgets
+            chart_html = get_or_create_widget_chart(
+                conn,
+                ticker,
+                dark_mode_status,
+                margin_l=-200,  # Genug Platz für die Y-Achsen-Preise
+                margin_r=20,  # Sehr kleiner rechter Rand
+                margin_t=5,
+                margin_b=5
+            )
 
             basic_info, _ = get_stock_basic_info_yfinance(ticker)
             popular_stocks_charts[ticker] = {
@@ -716,7 +731,6 @@ def search_stock_page():
             }
 
     if query:
-        # ... (Suchlogik bleibt unverändert)
         if not ALPHA_VANTAGE_API_KEY:
             error = "Suche ist deaktiviert, da der Alpha Vantage API Key fehlt."
         else:
@@ -729,17 +743,19 @@ def search_stock_page():
                 results.sort(key=lambda x: x['yfinance_valid'], reverse=True)
             elif not error:
                 flash(f"Keine Ergebnisse für '{query}' gefunden.", 'info')
-    if error:
-        flash(error, 'error')
+
+        if error:
+            flash(error, 'error')
+
+    print(popular_stocks_charts)
 
     return render_template(
-        'search_page.html',
-        query=query,
-        results=results,
-        error=error,
-        popular_stocks_charts=popular_stocks_charts
-    )
-
+            'search_page.html',
+            query=query,
+            results=results,
+            error=error,
+            popular_stocks_charts=popular_stocks_charts
+        )
 
 @app.route('/trade/<string:ticker_symbol>', methods=['GET', 'POST'])
 @login_required
@@ -935,7 +951,7 @@ def my_orders_page():
     open_tickers = {order['ticker'] for order in open_orders}
     if open_tickers:
         try:
-            data = yf.download(list(open_tickers), period="1d", progress=False)['Close']
+            data = yf.download(list(open_tickers), period="1d", progress=False, auto_adjust=True)['Close']
             if not data.empty:
                 latest_prices = data.iloc[-1]
                 prices = latest_prices.to_dict()

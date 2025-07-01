@@ -131,6 +131,10 @@ class LeaderboardEndpoint:
         if depot_data is None:
             return False
 
+        if depot_data.get("prices_not_complete") is True:
+            return False
+
+
         net_worth = depot_data['total_net_worth']
 
         # 4. Aktualisiere oder füge den Eintrag im Leaderboard hinzu (Upsert)

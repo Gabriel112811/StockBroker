@@ -218,7 +218,7 @@ class TradingEndpoint:
 
         tickers = {order.ticker for order in open_orders}
         try:
-            data = yf.download(list(tickers), period="1d", progress=False, group_by='ticker')
+            data = yf.download(list(tickers), period="1d", progress=False, group_by='ticker', auto_adjust=True)
             if data.empty:
                 print("Konnte keine Preisdaten von yfinance abrufen.")
                 return
