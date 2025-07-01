@@ -17,39 +17,6 @@
         </div>
     </form>
 
-    {% if popular_stocks_charts %}
-    <h2 style="text-align:center;">Beliebte Aktien</h2>
-    <p style="text-align:center; color:#555; margin-top:-20px; margin-bottom:25px;">
-        Hier siehst du die beliebtesten Aktien auf unserer Platform und wie viel in sie aktuell investiert ist.
-    </p>
-    <div class="popular-stocks-container" style="display: flex; justify-content: space-between; gap: 20px; margin-bottom: 40px;">
-        {% for ticker, data in popular_stocks_charts.items() %}
-        <div class="search-result-item" style="flex-direction: column; align-items: stretch; text-align: center; flex: 1; min-width: 300px; padding: 20px; overflow: hidden;">
-            <h3 style="margin:0; font-size: 1.1em;">
-                <a href="{{ url_for('stock_detail_page', ticker_symbol=ticker) }}" style="text-decoration:none;">
-                    {{ data.name }}
-                </a>
-            </h3>
-            <small style="color: #6c757d; margin-bottom: 10px; display: block;">{{ data.period_display }}</small>
-
-            <div class="chart-container" style="width: 100%; height: 150px;">
-                {% if data.chart %}
-                    {{ data.chart | safe }}
-                {% endif %}
-            </div>
-
-            <div style="margin-top: 5px; font-size: 0.9em; color: #6c757d;">
-                Investiert: <strong>€{{ "{:,.2f}".format(data.total_value) }}</strong>
-            </div>
-            <div class="widgext-actions" style="margin-top: 15px; display: flex; justify-content: center; gap: 10px;">
-                <a href="{{ url_for('stock_detail_page', ticker_symbol=ticker) }}" class="form-button" style="padding: 5px 10px; font-size: 0.85em; background-color: #6c757d;">Details</a>
-                <a href="{{ url_for('trade_page', ticker_symbol=ticker) }}" class="form-button" style="padding: 5px 10px; font-size: 0.85em;">Handeln</a>
-            </div>
-        </div>
-        {% endfor %}
-    </div>
-    {% endif %}
-
     {% if error %}
         <div class="error-box">{{ error }}</div>
     {% endif %}
@@ -87,6 +54,39 @@
         </ul>
     {% elif query and not error %}
          <p style="text-align:center;">Keine Ergebnisse für "{{ query }}" gefunden.</p>
+    {% endif %}
+
+    {% if popular_stocks_charts %}
+    <h2 style="text-align:center;">Beliebte Aktien</h2>
+    <p style="text-align:center; color:#555; margin-top:-20px; margin-bottom:25px;">
+        Hier siehst du die beliebtesten Aktien auf unserer Platform und wie viel in sie aktuell investiert ist.
+    </p>
+    <div class="popular-stocks-container" style="display: flex; justify-content: space-between; gap: 20px; margin-bottom: 40px;">
+        {% for ticker, data in popular_stocks_charts.items() %}
+        <div class="search-result-item" style="flex-direction: column; align-items: stretch; text-align: center; flex: 1; min-width: 300px; padding: 20px; overflow: hidden;">
+            <h3 style="margin:0; font-size: 1.1em;">
+                <a href="{{ url_for('stock_detail_page', ticker_symbol=ticker) }}" style="text-decoration:none;">
+                    {{ data.name }}
+                </a>
+            </h3>
+            <small style="color: #6c757d; margin-bottom: 10px; display: block;">{{ data.period_display }}</small>
+
+            <div class="chart-container" style="width: 100%; height: 150px;">
+                {% if data.chart %}
+                    {{ data.chart | safe }}
+                {% endif %}
+            </div>
+
+            <div style="margin-top: 5px; font-size: 0.9em; color: #6c757d;">
+                Investiert: <strong>€{{ "{:,.2f}".format(data.total_value) }}</strong>
+            </div>
+            <div class="widgext-actions" style="margin-top: 15px; display: flex; justify-content: center; gap: 10px;">
+                <a href="{{ url_for('stock_detail_page', ticker_symbol=ticker) }}" class="form-button" style="padding: 5px 10px; font-size: 0.85em; background-color: #6c757d;">Details</a>
+                <a href="{{ url_for('trade_page', ticker_symbol=ticker) }}" class="form-button" style="padding: 5px 10px; font-size: 0.85em;">Handeln</a>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
     {% endif %}
 </div>
 {% endblock %}
