@@ -254,7 +254,7 @@ class ENDPOINT:
         error_messages = []
 
         email = _strip_submails(email)
-        username = username.lower()
+        #username = username.lower()
 
         if not UTILITIES.is_username_valid(conn, username).get("success"):
             error_messages.append("Da steht doch sogar, dass dieser Benutzername nicht geht!!!")
@@ -347,47 +347,46 @@ class ENDPOINT:
     @staticmethod
     def login(conn: sqlite3.Connection, username_email: str, password: str) -> dict:
         output = UTILITIES.get_base_protocol()
-        username_email = str(username_email).lower()
-        #try:
-        if _is_email_format_valid(username_email):
+        try:
+            if _is_email_format_valid(username_email):
 
-            username_email = _strip_submails(username_email)
+                username_email = _strip_submails(username_email)
 
-            sql = "SELECT user_id, username, password_hash, salt, email, is_verified FROM all_users WHERE email = ?"
-        else:
-            sql = "SELECT user_id, username, password_hash, salt, email, is_verified FROM all_users WHERE username = ?"
-        cursor = conn.cursor()
-        cursor.execute(sql, (username_email,))
-        user_data = cursor.fetchone()
+                sql = "SELECT user_id, username, password_hash, salt, email, is_verified FROM all_users WHERE email = ?"
+            else:
+                sql = "SELECT user_id, username, password_hash, salt, email, is_verified FROM all_users WHERE username = ?"
+            cursor = conn.cursor()
+            cursor.execute(sql, (username_email,))
+            user_data = cursor.fetchone()
 
-        if user_data is None:
-            output["message"] = "Benutzername oder E-Mail nicht gefunden."
-            return output
+            if user_data is None:
+                output["message"] = "Benutzername oder E-Mail nicht gefunden."
+                return output
 
-        user_id, username, stored_hash, stored_salt, user_email, is_verified = user_data
+            user_id, username, stored_hash, stored_salt, user_email, is_verified = user_data
 
-        if not UTILITIES.verify_password(stored_hash, stored_salt, password):
-            output["message"] = "Falsches Passwort."
-            return output
+            if not UTILITIES.verify_password(stored_hash, stored_salt, password):
+                output["message"] = "Falsches Passwort."
+                return output
 
-        # NEUER CHECK: Ist der Account verifiziert?
-        if not is_verified:
-            output["message"] = "Dein Account ist noch nicht verifiziert. Bitte prüfe deine E-Mails."
-            # Optional: Neuen Token senden
-            # verification_token = TokenEndpoint.generate_email_token(conn, user_id)
-            # send_confirmation_email(user_email, username, verification_token)
-            return output
+            # NEUER CHECK: Ist der Account verifiziert?
+            if not is_verified:
+                output["message"] = "Dein Account ist noch nicht verifiziert. Bitte prüfe deine E-Mails."
+                # Optional: Neuen Token senden
+                # verification_token = TokenEndpoint.generate_email_token(conn, user_id)
+                # send_confirmation_email(user_email, username, verification_token)
+                return output
 
-        ENDPOINT.update_last_login_date(conn, user_id)
+            ENDPOINT.update_last_login_date(conn, user_id)
 
-        output["success"] = True
-        output["message"] = f"Willkommen zurück, {username}!"
-        output["user_id"] = user_id
-        output["user_email"] = user_email
-        output["username"] = username
-        #except Exception as e:
-            #print(f"Fehler beim Login: {e}")
-            #output["message"] = "Ein interner Fehler ist aufgetreten."
+            output["success"] = True
+            output["message"] = f"Willkommen zurück, {username}!"
+            output["user_id"] = user_id
+            output["user_email"] = user_email
+            output["username"] = username
+        except Exception as e:
+            print(f"Fehler beim Login: {e}")
+            output["message"] = "Ein interner Fehler ist aufgetreten."
         return output
 
     @staticmethod

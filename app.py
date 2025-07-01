@@ -907,7 +907,7 @@ def leaderboard_page():
     conn.close()
 
     # --- Scheduler-Logik für die Anzeige der nächsten Aktualisierung (wie zuvor besprochen) ---
-    update_interval_minutes = 1  # Für Debugging. Auf 10 für Produktion ändern.
+    update_interval_minutes = 10  # Zeigt auf die nächste durch 10 teilbare Minute
     now = datetime.now()
     minutes_past_hour = now.minute
     updates_past_hour = minutes_past_hour // update_interval_minutes
