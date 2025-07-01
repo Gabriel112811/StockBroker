@@ -219,15 +219,14 @@
         <div class="logo"><a href="{{ url_for('landing_page') }}">StockBroker</a></div>
         <nav>
             <a href="{{ url_for('search_stock_page') }}" class="{{ 'active' if request.endpoint == 'search_stock_page' else '' }}">Suche</a>
+            <a href="{{ url_for('leaderboard_page') }}" class="{{ 'active' if request.endpoint == 'leaderboard_page' else '' }}">Leaderboard</a>
             {% if session.user_id %}
                 <a href="{{ url_for('dashboard_page') }}" class="{{ 'active' if request.endpoint == 'dashboard_page' else '' }}">Depot</a>
                 <a href="{{ url_for('my_orders_page') }}" class="{{ 'active' if request.endpoint == 'my_orders_page' else '' }}">Orders</a>
-                <a href="{{ url_for('leaderboard_page') }}" class="{{ 'active' if request.endpoint == 'leaderboard_page' else '' }}">Leaderboard</a>
 
                 <a href="{{ url_for('logout') }}">Logout ({{ session.username }})</a>
 
                 <a href="{{ url_for('settings_page') }}" title="Einstellungen" style="font-size: 1.5em; text-decoration: none;">⚙️</a>
-                <a href="{{ url_for('logout') }}" title="Logout">Logout</a>
             {% else %}
                 <a href="{{ url_for('login_page') }}" class="{{ 'active' if request.endpoint == 'login_page' else '' }}">Login</a>
                 <a href="{{ url_for('register_page') }}" class="{{ 'active' if request.endpoint == 'register_page' else '' }}">Registrieren</a>

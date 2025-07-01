@@ -966,43 +966,40 @@ def my_orders_page():
 def settings_page():
     conn = get_db()
     if request.method == 'POST':
-        # Instagram Link Logik
-        if 'set_ig_link' in request.form:
+        action = request.form.get('form_action')
+
+        if action == 'update_instagram_link':
             ig_link = request.form.get('ig_link')
             Settings.update_instagram_link(conn, session['user_id'], ig_link)
             flash('Instagram-Link aktualisiert!', 'success')
-        elif 'delete_ig_link' in request.form:
+
+        elif action == 'delete_instagram_link':
             Settings.update_instagram_link(conn, session['user_id'], None)
             flash('Instagram-Link entfernt!', 'success')
 
-        # Dark Mode Logik
-        if 'dark_mode' in request.form:
-            Settings.update_dark_mode(conn, session['user_id'], True)
-        else:
-            # Wenn die Checkbox nicht im Formular ist, wurde sie nicht angekreuzt
-            Settings.update_dark_mode(conn, session['user_id'], False)
+        elif action == 'update_dark_mode':
+            dark_mode_on = 'dark_mode' in request.form
+            Settings.update_dark_mode(conn, session['user_id'], dark_mode_on)
+            # Kein Flash, da die Änderung sofort sichtbar ist
 
-        # Username Änderungslogik
-        if 'new_username' in request.form:
+        elif action == 'update_username':
             new_username = request.form.get('new_username')
             if AccountEndpoint.can_change_username(conn, session['user_id']):
                 result = AccountEndpoint.update_username(conn, session['user_id'], new_username)
                 if result['success']:
-                    session['username'] = new_username  # Session-Variable aktualisieren!
+                    session['username'] = new_username
                     flash(result['message'], 'success')
                 else:
                     flash(result['message'], 'error')
             else:
                 flash('Du kannst deinen Namen nur alle 7 Tage ändern.', 'error')
-
+        
         conn.commit()
-        conn.close()
         return redirect(url_for('settings_page'))
 
     # GET Request
     user_settings = Settings.get_settings(conn, session['user_id'])
     can_change_name = AccountEndpoint.can_change_username(conn, session['user_id'])
-    conn.close()
     return render_template('settings.html', settings=user_settings, can_change_name=can_change_name)
 
 

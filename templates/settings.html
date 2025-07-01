@@ -10,10 +10,12 @@
         {% if settings.ig_link %}
             <p>Dein aktueller Link: <a href="{{ settings.ig_link }}" target="_blank">{{ settings.ig_link }}</a></p>
             <form method="POST" style="display: inline;">
+                <input type="hidden" name="form_action" value="delete_instagram_link">
                 <button type="submit" name="delete_ig_link" class="form-button">Link entfernen</button>
             </form>
         {% else %}
             <form method="POST">
+                <input type="hidden" name="form_action" value="update_instagram_link">
                 <div class="form-group">
                     <label for="ig_link">Instagram Profil-URL</label>
                     <input type="text" id="ig_link" name="ig_link" class="form-control" placeholder="https://www.instagram.com/dein_name">
@@ -28,6 +30,7 @@
     <div class="data-section">
         <h2>Darstellung</h2>
         <form method="POST">
+            <input type="hidden" name="form_action" value="update_dark_mode">
             <div class="form-group" style="display: flex; align-items: center;">
                 <input type="checkbox" id="dark_mode" name="dark_mode" {% if settings.dark_mode %}checked{% endif %} onchange="this.form.submit()">
                 <label for="dark_mode" style="margin-left: 10px; margin-bottom: 0;">Dark Mode aktivieren</label>
@@ -47,6 +50,7 @@
         </div>
         <div id="username-edit-container" style="display: none;">
             <form method="POST" style="display: flex; align-items: center; gap: 10px;">
+                <input type="hidden" name="form_action" value="update_username">
                 <input type="text" id="new_username" name="new_username" class="form-control" value="{{ session.username }}">
                 <button type="submit" style="border:none; background:none; cursor:pointer; font-size: 1.5em;">✔️</button>
             </form>
