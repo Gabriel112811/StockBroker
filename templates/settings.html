@@ -42,10 +42,10 @@
         <h2>Benutzername ändern</h2>
         <div id="username-display-container">
             Dein Benutzername: <strong>{{ session.username }}</strong>
-            {% if can_change_name %}
+            {% if change_status.can_change %}
                 <button id="edit-username-btn" style="border:none; background:none; cursor:pointer; font-size: 1em;">✏️</button>
             {% else %}
-                <span title="Änderung erst wieder in 7 Tagen möglich">🔒</span>
+                <span title="Änderung erst wieder möglich am {{ change_status.next_change_date }}">🔒 Nächste Änderung: {{ change_status.next_change_date }}</span>
             {% endif %}
         </div>
         <div id="username-edit-container" style="display: none;">

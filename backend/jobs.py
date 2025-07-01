@@ -2,6 +2,7 @@ from app import app, get_db
 from backend.trading import TradingEndpoint
 from backend.leaderboard import LeaderboardEndpoint
 from backend.tokens import TokenEndpoint
+from backend.accounts_to_database import ENDPOINT as AccountEndpoint
 
 
 def scheduled_order_processing_job():
@@ -34,6 +35,8 @@ def scheduled_daily_processing_job():
         try:
             print("Starte Daily Scheduler")
             LeaderboardEndpoint.decimate_entries(db)
+            result = AccountEndpoint.delete_unverified_users(db)
+            print(result.get("message"))
             db.commit()
         except Exception as e:
             print(f"[Scheduler] Fehler im Job 'leaderboard_processing_job': {e}")

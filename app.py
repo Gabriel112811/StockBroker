@@ -56,16 +56,8 @@ def get_db():
 # if name is main gezwungene alternative
 with app.app_context():
     local_conn = get_db()
-    #result = AccountEndpoint.create_account(local_conn, "abcdef", "fanvielerdinge@gmail.com", "lkjsadfjashdf",)
-    #print(result)
-    #result = AccountEndpoint.verify_email_delete_token(local_conn, "tDpH8yzRfms")
-    #print(result)
-    #pprint(LeaderboardEndpoint.decimate_entries(conn))
-    #pprint(LeaderboardEndpoint.decimate_entries(conn))
-
-    #conn.commit()
+    local_conn.commit()
     local_conn.close()
-    #exit() #l 222 account management löschen
 
 @app.teardown_appcontext
 def close_connection(exception):
@@ -984,7 +976,8 @@ def settings_page():
 
         elif action == 'update_username':
             new_username = request.form.get('new_username')
-            if AccountEndpoint.can_change_username(conn, session['user_id']):
+            change_status = AccountEndpoint.can_change_username(conn, session['user_id'])
+            if change_status['can_change']:
                 result = AccountEndpoint.update_username(conn, session['user_id'], new_username)
                 if result['success']:
                     session['username'] = new_username
@@ -992,15 +985,15 @@ def settings_page():
                 else:
                     flash(result['message'], 'error')
             else:
-                flash('Du kannst deinen Namen nur alle 7 Tage ändern.', 'error')
+                flash(f"Du kannst deinen Namen erst wieder am {change_status['next_change_date']} ändern.", 'error')
         
         conn.commit()
         return redirect(url_for('settings_page'))
 
     # GET Request
     user_settings = Settings.get_settings(conn, session['user_id'])
-    can_change_name = AccountEndpoint.can_change_username(conn, session['user_id'])
-    return render_template('settings.html', settings=user_settings, can_change_name=can_change_name)
+    change_status = AccountEndpoint.can_change_username(conn, session['user_id'])
+    return render_template('settings.html', settings=user_settings, change_status=change_status)
 
 
 # Neue Route für den Live-Check des Benutzernamens

@@ -5,10 +5,13 @@
 {% block content %}
 <div class="auth-container">
     <h1>Neuen Account erstellen</h1>
+    <p style="text-align:center; color:#555; margin-top:-20px; margin-bottom:25px;">
+        Tritt bei, um dich mit deinen Freunden zu batteln.
+    </p>
     <form method="POST" action="{{ url_for('register_page') }}">
 
         <div class="form-group">
-            <label for="username">Benutzername</label>
+            <label for="username">öffentlicher Benutzername</label>
             <input type="text" id="username" name="username" class="form-control" required minlength="3">
             <div id="username-availability-feedback" style="font-size: 0.9em; margin-top: 5px; height: 1em;"></div>
         </div>

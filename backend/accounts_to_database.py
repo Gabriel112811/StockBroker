@@ -273,8 +273,7 @@ class ENDPOINT:
             #error_messages.append("Dieser Benutzername ist schon vergeben.")
 
         if _is_email_in_db(conn, email, include_submails=True):
-            pass
-            #error_messages.append("Diese E-Mail-Adresse ist schon vergeben.")
+            error_messages.append("Diese E-Mail-Adresse ist schon vergeben.")
 
         if len(error_messages) == 1:
             output['message'] = error_messages[0]
@@ -557,14 +556,19 @@ class ENDPOINT:
             return False
 
     @staticmethod
-    def can_change_username(conn: sqlite3.Connection, user_id: int) -> bool:
-        """Prüft, ob der Benutzername geändert werden darf (mehr als 7 Tage seit letzter Änderung)."""
+    def can_change_username(conn: sqlite3.Connection, user_id: int) -> dict:
+        """Prüft, ob der Benutzername geändert werden darf und gibt zurück, wann die nächste Änderung möglich ist."""
         settings = Settings.get_settings(conn, user_id)
         if not settings or not settings['last_name_change']:
-            return True  # Noch nie geändert, also erlaubt
+            return {"can_change": True, "next_change_date": None}  # Noch nie geändert
 
         last_change_time = datetime.fromisoformat(settings['last_name_change'])
-        return (datetime.now() - last_change_time) > timedelta(days=7)
+        seven_days_later = last_change_time + timedelta(days=7)
+
+        if datetime.now() > seven_days_later:
+            return {"can_change": True, "next_change_date": None}
+        else:
+            return {"can_change": False, "next_change_date": seven_days_later.strftime('%d.%m.%Y, %H:%M Uhr')}
 
     @staticmethod
     def update_username(conn: sqlite3.Connection, user_id: int, new_username: str) -> dict:
@@ -586,6 +590,43 @@ class ENDPOINT:
         cursor = conn.cursor()
         login_time = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
         cursor.execute("UPDATE all_users SET last_login = ? WHERE user_id = ?", (login_time, user_id))
+
+    @staticmethod
+    def delete_unverified_users(conn: sqlite3.Connection) -> dict:
+        """Löscht alle Benutzer, die ihren Account nicht innerhalb von 24 Stunden verifiziert haben."""
+        output = UTILITIES.get_base_protocol()
+        try:
+            # Berechne den Zeitpunkt vor 24 Stunden
+            twenty_four_hours_ago = datetime.now() - timedelta(hours=24)
+            twenty_four_hours_ago_str = twenty_four_hours_ago.strftime('%Y-%m-%d %H:%M:%S')
+
+            cursor = conn.cursor()
+            # Zähle zuerst, wie viele Benutzer gelöscht werden
+            count_sql = """
+                SELECT COUNT(*) FROM all_users 
+                WHERE is_verified = 0 AND joined_date <= ?
+            """
+            cursor.execute(count_sql, (twenty_four_hours_ago_str,))
+            num_deleted = cursor.fetchone()[0]
+
+            if num_deleted > 0:
+                # Führe die Löschung durch
+                delete_sql = """
+                    DELETE FROM all_users 
+                    WHERE is_verified = 0 AND joined_date <= ?
+                """
+                cursor.execute(delete_sql, (twenty_four_hours_ago_str,))
+                output["message"] = f"{num_deleted} nicht verifizierte Benutzer wurden gelöscht."
+            else:
+                output["message"] = "Keine abgelaufenen, nicht verifizierten Benutzer gefunden."
+
+            output["success"] = True
+            output["deleted_count"] = num_deleted
+
+        except sqlite3.Error as e:
+            output["message"] = f"Datenbankfehler: {e}"
+        
+        return output
 
 
 class Settings:
