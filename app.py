@@ -436,7 +436,9 @@ def determine_actual_interval_and_period(selected_period, selected_quality):
                            f"auf '{period_display_actual}' angepasst, um Intervall '{actual_interval}' zu unterstützen.")
     return actual_period, actual_interval, adjustment_note
 
-def generate_stock_plotly_chart(ticker_symbol, period="1y", interval="1d", quality_note=None, remove_gaps=True, dark_mode=False, show_axis_titles=True, chart_height=None, margin_l=50, margin_r=20, margin_t=80, margin_b=50):
+def generate_stock_plotly_chart(ticker_symbol, period="1y", interval="1d", quality_note=None, remove_gaps=True,
+                                dark_mode=False, show_axis_titles=True, chart_height=None, chart_width=None,
+                                margin_l=50, margin_r=20, margin_t=80, margin_b=50):
     chart_html = None
     error_msg = quality_note if quality_note else None
     company_name = ticker_symbol
@@ -473,20 +475,28 @@ def generate_stock_plotly_chart(ticker_symbol, period="1y", interval="1d", quali
 
             title_text = f'Kurs: {company_name} ({ticker_symbol})<br><span style="font-size:0.8em;">Zeitraum: {period_display}, Auflösung: {interval_display}</span>' if show_axis_titles else ''
 
+            # Spezielle Y-Achsen-Einstellungen für Widgets, um Ränder automatisch anzupassen
+            yaxis_settings = {
+                "gridcolor": grid_color, "linecolor": grid_color, 
+                "zeroline": False, "showticklabels": True
+            }
+            if not show_axis_titles:  # Dies ist ein Widget
+                # yaxis_settings["automargin"] = True # Deaktiviert für konsistente Widget-Größen
+                pass
+
             fig.update_layout(
                 title=title_text,
                 xaxis_title='Datum / Uhrzeit' if show_axis_titles else '',
                 yaxis_title='Preis' if show_axis_titles else '',
                 xaxis_rangeslider_visible=False,
-                # Diese Zeile wird angepasst
                 margin=dict(l=margin_l, r=margin_r, t=margin_t, b=margin_b),
                 paper_bgcolor='rgba(0,0,0,0)',
                 plot_bgcolor='rgba(0,0,0,0)',
                 font=dict(color=font_color),
                 xaxis=dict(gridcolor=grid_color, linecolor=grid_color, zeroline=False, showticklabels=False),
-                # X-Achsen-Labels ausblenden
-                yaxis=dict(gridcolor=grid_color, linecolor=grid_color, zeroline=False, showticklabels=True),
+                yaxis=yaxis_settings,
                 height=chart_height,
+                width=chart_width,
                 showlegend=False
             )
 
@@ -500,7 +510,12 @@ def generate_stock_plotly_chart(ticker_symbol, period="1y", interval="1d", quali
                         dict(bounds=["sat", "mon"]),  # Wochenenden
                         dict(pattern="hour", bounds=[16, 9.5])  # Außerhalb der US-Handelszeiten (angenommen)
                     ])
-            chart_html = fig.to_html(full_html=False, include_plotlyjs='cdn', config={'displayModeBar': False})
+
+            # Konfiguration für statische Plots (Widgets) vs. interaktive Plots
+            plot_config = {'displayModeBar': False}
+            if not show_axis_titles:  # Dies ist ein Widget
+                plot_config['staticPlot'] = True
+            chart_html = fig.to_html(full_html=False, include_plotlyjs='cdn', config=plot_config)
 
     except Exception as e:
         exception_str = str(e)
@@ -601,45 +616,46 @@ def create_portfolio_graph(history_data: list[dict], dark_mode: bool = False, li
     return fig.to_html(full_html=False, include_plotlyjs='cdn', config={'displayModeBar': False})
 
 
-def get_or_create_widget_chart(conn, ticker, dark_mode, **kwargs):
+def get_or_create_widget_chart(conn, ticker, dark_mode):
     """
     Holt einen Chart aus dem Cache oder generiert ihn neu.
-    Akzeptiert jetzt zusätzliche Keyword-Argumente für die Chart-Generierung.
+    Die Ränder sind für die Widget-Ansicht optimiert.
     """
     cursor = conn.cursor()
     twenty_four_hours_ago = datetime.now() - timedelta(hours=24)
 
-    if dark_mode is None:
-        dark_mode = 0
+    dark_mode_int = int(dark_mode) if dark_mode is not None else 0
 
     cursor.execute("""
         SELECT chart_html FROM cached_charts 
         WHERE ticker = ? AND dark_mode = ? AND last_updated > ?
-    """, (ticker, int(dark_mode), twenty_four_hours_ago))
+    """, (ticker, dark_mode_int, twenty_four_hours_ago))
 
     result = cursor.fetchone()
     if result:
         return result[0]
 
-    chart_period = "1y"
-    chart_interval = "1d"
-
+    # Chart neu generieren mit festen Widget-Einstellungen
     chart_html, _, _ = generate_stock_plotly_chart(
-        ticker,
-        period=chart_period,
-        interval=chart_interval,
+        ticker_symbol=ticker,
+        period="1y",
+        interval="1d",
         remove_gaps=True,
         dark_mode=dark_mode,
         show_axis_titles=False,
         chart_height=150,
-        **kwargs
+        chart_width=10, # Feste Breite für Widgets
+        margin_l=40,  # Fester linker Rand statt automargin
+        margin_r=0,
+        margin_t=5,
+        margin_b=5
     )
 
     if chart_html:
         cursor.execute("""
             INSERT OR REPLACE INTO cached_charts (ticker, dark_mode, chart_html, last_updated)
-            VALUES (?, ?, ?, ?)
-        """, (ticker, int(dark_mode), chart_html, datetime.now()))
+            VALUES (?, ?, ?, ?)""",
+                       (ticker, dark_mode_int, chart_html, datetime.now()))
         conn.commit()
 
     return chart_html
@@ -710,17 +726,7 @@ def search_stock_page():
         period_display_text = next((p[1] for p in AVAILABLE_PERIODS if p[0] == chart_period), chart_period)
 
         for ticker, total_value in popular_stocks.items():
-            # HIER IST DIE ANPASSUNG: Präzise Ränder für die Widgets
-            chart_html = get_or_create_widget_chart(
-                conn,
-                ticker,
-                dark_mode_status,
-                margin_l=-200,  # Genug Platz für die Y-Achsen-Preise
-                margin_r=20,  # Sehr kleiner rechter Rand
-                margin_t=5,
-                margin_b=5
-            )
-
+            chart_html = get_or_create_widget_chart(conn, ticker, dark_mode_status)
             basic_info, _ = get_stock_basic_info_yfinance(ticker)
             popular_stocks_charts[ticker] = {
                 'chart': chart_html,
