@@ -5,7 +5,9 @@
 {% block content %}
 <div class="content-container">
     <h1>Leaderboard</h1>
-    <p class="info-box">Hier sind die reichsten Broker unserer Plattform. Die Daten werden maximal alle 10 Minuten aktualisiert.</p>
+    <p style="text-align: center; color: #666; margin-top: -15px; margin-bottom: 25px;">
+        Hier sind die reichsten Broker unserer Plattform.
+    </p>
     {% if next_update_time %}
         <p style="text-align: center; color: #666; margin-top: -15px; margin-bottom: 25px;">
             Nächste Aktualisierung um: {{ next_update_time.strftime('%H:%M:%S') }}

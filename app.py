@@ -640,7 +640,7 @@ def get_or_generate_widget_chart(conn, ticker: str, dark_mode: bool) -> str | No
         dark_mode=dark_mode,
         show_axis_titles=False,
         chart_height=150,
-        margin_l=0, margin_r=0, margin_t=5, margin_b=5
+        margin_l=0, margin_r=30, margin_t=5, margin_b=5
     )
 
     if chart_html and not error_msg:
