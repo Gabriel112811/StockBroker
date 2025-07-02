@@ -12,7 +12,7 @@ from datetime import datetime, timedelta
 
 from backend.accounts_to_database import UTILITIES, ENDPOINT, Settings
 from backend.depot_system import DepotEndpoint
-
+from yfinance.exceptions import YFPricesMissingError
 
 link_color = "#e017c0"
 
@@ -126,14 +126,21 @@ class LeaderboardEndpoint:
         """
         cursor = conn.cursor()
 
-        # 1. Hole Cash und User-ID des Benutzers
-        depot_data = DepotEndpoint.get_depot_details(conn, user_id)
-        if depot_data is None:
+        # 1. Versuche drei mal, die daten zu holen.
+        tries = 3
+        for i in range(tries):
+            try:
+                depot_data = DepotEndpoint.get_depot_details(conn, user_id)
+            except YFPricesMissingError as e:
+                print(f"Versuch {i + 1}/{tries} fehlgeschlagen: {e}")
+                continue
+            if depot_data is None:
+                continue
+            if depot_data.get("prices_not_complete") is True:
+                continue
+            break
+        else:
             return False
-
-        if depot_data.get("prices_not_complete") is True:
-            return False
-
 
         net_worth = depot_data['total_net_worth']
 

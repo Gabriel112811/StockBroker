@@ -563,10 +563,11 @@ def create_portfolio_graph(history_data: list[dict], dark_mode: bool = False, li
 
     dates = [datetime.fromisoformat(item['date']) for item in history_data]
     net_worths = [item['net_worth'] for item in history_data]
-    start_worth = net_worths[0]
-    end_worth = net_worths[-1]
+    start_worth = net_worths[-1]
+    end_worth = net_worths[0]
+    #print(f"Startworth: {start_worth}, Endworth: {end_worth}")
     percent_changes = [((val / start_worth) - 1) * 100 for val in net_worths]
-    is_gain = end_worth >= start_worth
+    is_gain = end_worth > start_worth
     bg_color = 'rgba(0,0,0,0)'
 
     if dark_mode:
