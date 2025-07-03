@@ -217,6 +217,8 @@ def do_email_token_verification(token) -> bool:
     conn.commit()
     if result.get('success'):
         user_id = result.get('user_id')
+        LeaderboardEndpoint.insert_current_net_worth_for_user(conn, user_id)
+        conn.commit()
         if do_login(conn, UTILITIES.get_username(conn, user_id), instant_login_result=result):
             return True
     else:
