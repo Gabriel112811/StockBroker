@@ -92,7 +92,7 @@
         /* =================================== */
         .dark-mode {
             background-color: #0c1014;
-            color: #cdd3da;
+            color: #cdd3da; /* Default text color */
         }
 
         /* --- Container & Navbar --- */
@@ -100,30 +100,54 @@
         .dark-mode .content-container,
         .dark-mode .auth-container {
             background-color: #171c22;
-            color: #cdd3da;
             border-color: #2a2a2a;
             box-shadow: 0 2px 8px rgba(0,0,0,0.3);
         }
 
-        .dark-mode h1, .dark-mode h2 {
+        /* --- Typography --- */
+        /* General text elements */
+        .dark-mode,
+        .dark-mode p, .dark-mode span, .dark-mode label,
+        .dark-mode .table,
+        .dark-mode .navbar nav a,
+        .dark-mode .search-result-item p {
+            color: #cdd3da;
+        }
+
+        /* Headings */
+        .dark-mode h1, .dark-mode h2, .dark-mode h3,
+        .dark-mode .search-result-item h3 a {
             color: #ffffff;
+        }
+
+        .dark-mode h1, .dark-mode h2 {
             border-bottom-color: #2a3b4d;
         }
 
+        /* Special case for non-tradable search result titles */
+        .dark-mode .search-result-item h3 {
+            color: #999999;
+        }
+
         /* --- Navigation & Links --- */
-        .dark-mode .navbar nav a {
-            color: #cdd3da;
+        .dark-mode a {
+            color: #4a90e2;
         }
         .dark-mode .navbar nav a:hover,
         .dark-mode .navbar nav a.active {
             color: #4a90e2;
             text-decoration: none;
         }
-        .dark-mode a {
-            color: #4a90e2;
+        /* Ensure headings that are links get the heading color */
+        .dark-mode h1 a, .dark-mode h2 a, .dark-mode h3 a {
+            color: inherit; /* Inherit color from heading */
+            text-decoration: none;
+        }
+        .dark-mode h1 a:hover, .dark-mode h2 a:hover, .dark-mode h3 a:hover {
+            text-decoration: underline;
         }
 
-        /* --- Formulare & Eingabefelder (KORRIGIERT) --- */
+        /* --- Formulare & Eingabefelder --- */
         .dark-mode .form-group input[type="email"],
         .dark-mode .form-group input[type="password"],
         .dark-mode .form-group input[type="text"],
@@ -150,20 +174,17 @@
             color: #8a99a8;
         }
 
-        /* --- Buttons (KORRIGIERT) --- */
-        .dark-mode a.form-button {
-            color: white !important; /* Verhindert "blau auf blau" bei Links als Buttons */
+        /* --- Buttons --- */
+        .dark-mode a.form-button,
+        .dark-mode button[type="submit"] {
+            color: white !important; /* Ensures white text on blue buttons */
         }
         .dark-mode span.form-button {
-            background-color: #5a6268 !important; /* Überschreibt inline style für Lesbarkeit */
+            background-color: #5a6268 !important; /* Overrides inline style for readability */
             color: white !important;
         }
 
-
         /* --- Tabellen --- */
-        .dark-mode .table {
-            color: #cdd3da;
-        }
         .dark-mode .table th,
         .dark-mode .table td {
             border-top-color: #2a3b4d;
@@ -191,22 +212,8 @@
             background-color: #1a2026;
             border: 1px solid #2a3b4d;
         }
-        /* NEU: Farbe für nicht-handelbare Titel im Dark Mode */
-        .dark-mode .search-result-item h3 {
-            color: #999999;
-        }
-        .dark-mode .search-result-item h3 a {
-            color: #ffffff;
-        }
-        .dark-mode .search-result-item p {
-            color: #cdd3da !important;
-        }
 
-
-        /* --- Allgemeine Texte & Info-Boxen --- */
-        .dark-mode p, .dark-mode span, .dark-mode label {
-            color: #cdd3da;
-        }
+        /* --- Info-Boxen --- */
         .dark-mode .info-box {
             background-color: rgba(74, 144, 226, 0.1);
             color: #a3c9f5;
