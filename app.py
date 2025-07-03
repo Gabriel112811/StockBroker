@@ -458,12 +458,18 @@ def generate_stock_plotly_chart(ticker_symbol, period="1y", interval="1d", quali
         else:
             font_color = '#cdd3da' if dark_mode else '#1c1e21'
             grid_color = 'rgba(255, 255, 255, 0.1)' if dark_mode else 'rgba(0, 0, 0, 0.1)'
+            
+            # Farben für Candlesticks definieren
+            increasing_color = '#00C805' if dark_mode else '#198754'
+            decreasing_color = '#FF4136' if dark_mode else '#dc3545'
 
             fig = go.Figure()
             fig.add_trace(go.Candlestick(x=hist_data.index,
                                          open=hist_data['Open'], high=hist_data['High'],
                                          low=hist_data['Low'], close=hist_data['Close'],
-                                         name=f'{ticker_symbol}'))
+                                         name=f'{ticker_symbol}',
+                                         increasing_line_color=increasing_color,
+                                         decreasing_line_color=decreasing_color))
 
             period_display = next((p[1] for p in AVAILABLE_PERIODS if p[0] == period), period)
             interval_map_for_display = {"1m": "1 Min", "2m": "2 Min", "5m": "5 Min", "15m": "15 Min",
@@ -474,7 +480,6 @@ def generate_stock_plotly_chart(ticker_symbol, period="1y", interval="1d", quali
 
             title_text = f'Kurs: {company_name} ({ticker_symbol})<br><span style="font-size:0.8em;">Zeitraum: {period_display}, Auflösung: {interval_display}</span>' if show_axis_titles else ''
 
-            # Spezielle Y-Achsen-Einstellungen für Widgets, um Ränder automatisch anzupassen
             yaxis_settings = {
                 "gridcolor": grid_color, "linecolor": grid_color, 
                 "zeroline": False, "showticklabels": True
@@ -491,24 +496,21 @@ def generate_stock_plotly_chart(ticker_symbol, period="1y", interval="1d", quali
                 paper_bgcolor='rgba(0,0,0,0)',
                 plot_bgcolor='rgba(0,0,0,0)',
                 font=dict(color=font_color),
-                xaxis=dict(gridcolor=grid_color, linecolor=grid_color, zeroline=False, showticklabels=False),
+                xaxis=dict(gridcolor=grid_color, linecolor=grid_color, zeroline=False, showticklabels=show_axis_titles),
                 yaxis=yaxis_settings,
                 height=chart_height,
                 showlegend=False
             )
 
             if remove_gaps:
-                # Lücken für Wochenenden bei täglichen, wöchentlichen, etc. Intervallen entfernen
                 if interval in ["1d", "1wk", "1mo", "3mo"]:
                     fig.update_xaxes(rangebreaks=[dict(bounds=["sat", "mon"])])
-                # Lücken für Wochenenden UND Nächte bei Intraday-Intervallen entfernen
                 elif 'm' in interval or 'h' in interval:
                     fig.update_xaxes(rangebreaks=[
-                        dict(bounds=["sat", "mon"]),  # Wochenenden
-                        dict(pattern="hour", bounds=[16, 9.5])  # Außerhalb der US-Handelszeiten (angenommen)
+                        dict(bounds=["sat", "mon"]), 
+                        dict(pattern="hour", bounds=[16, 9.5])
                     ])
 
-            # Konfiguration für statische Plots (Widgets) vs. interaktive Plots
             plot_config = {'displayModeBar': False}
             if not show_axis_titles:  # Dies ist ein Widget
                 plot_config['staticPlot'] = True
@@ -876,7 +878,6 @@ def stock_detail_page(ticker_symbol):
 
     selected_period = request.args.get('period', '1y')
     selected_quality = request.args.get('quality', 'normal')
-    # Eine Checkbox ist nur in den request.args, wenn sie angehakt ist.
     remove_gaps_bool = 'remove_gaps' in request.args
 
     if not any(p[0] == selected_period for p in AVAILABLE_PERIODS): selected_period = '1y'
@@ -884,18 +885,21 @@ def stock_detail_page(ticker_symbol):
 
     actual_period, actual_interval, adjustment_note = determine_actual_interval_and_period(selected_period, selected_quality)
 
+    # Dark-Mode-Status aus dem globalen 'g'-Objekt holen
+    dark_mode_status = g.user_settings and g.user_settings.get('dark_mode') == 1
+
     chart_html, chart_error_msg, _ = generate_stock_plotly_chart(ticker_symbol,
                                                                  period=actual_period,
                                                                  interval=actual_interval,
                                                                  quality_note=adjustment_note,
-                                                                 remove_gaps=remove_gaps_bool)
+                                                                 remove_gaps=remove_gaps_bool,
+                                                                 dark_mode=dark_mode_status) # Dark mode übergeben
 
     overall_error = chart_error_msg if chart_error_msg else stock_details.get('error')
     if overall_error and adjustment_note and "Hinweis:" in adjustment_note and "Fehler:" not in adjustment_note:
-        # If there's an error but also a non-error adjustment note, prioritize the note if it's just informational
-        if not chart_error_msg and not stock_details.get('error'): # if the only "error" is the note
+        if not chart_error_msg and not stock_details.get('error'):
              overall_error = adjustment_note
-        elif adjustment_note not in overall_error : # append note if not already part of error
+        elif adjustment_note not in overall_error :
              overall_error = f"{adjustment_note} | {overall_error}"
 
 
