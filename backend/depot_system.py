@@ -36,8 +36,6 @@ class DepotEndpoint:
         portfolio_value = 0.0
         positions_detailed = []
 
-        prices_not_complete = not tickers
-
         # 3. Aktuelle Kurse für alle Ticker im Depot abfragen (falls vorhanden)
         if tickers:
             try:
@@ -46,13 +44,23 @@ class DepotEndpoint:
                 for ticker, quantity, avg_price in positions_raw:
                     current_price = None
                     current_value = None
+                    absolute_profit = None
+                    relative_profit = None
+
                     if not data.empty and ticker in data and not pd.isna(data[ticker]['Close'].iloc[-1]):
                         current_price = data[ticker]['Close'].iloc[-1]
                         current_value = quantity * current_price
-                        if current_value is None:
-                            prices_not_complete = True
-                        print(current_value, prices_not_complete)
                         portfolio_value += current_value
+
+                        # Gewinn/Verlust berechnen
+                        purchase_value = avg_price * quantity
+                        if purchase_value > 0:
+                            absolute_profit = current_value - purchase_value
+                            relative_profit = (absolute_profit / purchase_value) * 100
+                        else: # Should not happen if quantity > 0
+                            absolute_profit = 0
+                            relative_profit = 0
+
 
                     positions_detailed.append({
                         "ticker": ticker,
@@ -60,6 +68,8 @@ class DepotEndpoint:
                         "average_purchase_price": avg_price,
                         "current_price": current_price,
                         "current_value": current_value,
+                        "absolute_profit": absolute_profit,
+                        "relative_profit": relative_profit,
                     })
 
             except Exception as e:
@@ -69,19 +79,12 @@ class DepotEndpoint:
                     positions_detailed.append({
                         "ticker": ticker, "quantity": quantity, "average_purchase_price": avg_price,
                         "current_price": None, "current_value": None,
+                        "absolute_profit": None, "relative_profit": None,
                     })
 
         # 4. Gesamtergebnis zusammenstellen
         total_net_worth = cash_balance + portfolio_value
-
-        prices_missing = False
-        for position in positions_detailed:
-            if position.get("current_price") is None:
-                prices_missing = True
-                break
-            if position.get("current_value") is None:
-                prices_missing = True
-                break
+        prices_missing = any(p.get("current_price") is None for p in positions_detailed)
 
 
         return {

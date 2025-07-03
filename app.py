@@ -559,21 +559,25 @@ def yfinance_ticker_is_valid(ticker_symbol: str) -> bool:
 
 def is_profitable(history_data: list[dict]) -> bool:
     net_worths = [item['net_worth'] for item in history_data]
-    start_worth = net_worths[-1]
-    end_worth = net_worths[0]
+    start_worth = net_worths[0]
+    end_worth = net_worths[-1]
+    print(f"start: {start_worth}, endworth:{end_worth}, {end_worth > start_worth}")
     return end_worth > start_worth
 
 def create_portfolio_graph(history_data: list[dict], dark_mode: bool = False, line_strength:int=4) -> str | None:
     if not history_data or len(history_data) < 2:
         return None
 
+    # Daten sind bereits nach Datum sortiert (neueste zuerst), für die Berechnung umkehren
+    history_data.reverse()
     dates = [datetime.fromisoformat(item['date']) for item in history_data]
     net_worths = [item['net_worth'] for item in history_data]
-    start_worth = net_worths[-1]
-    end_worth = net_worths[0]
-    #print(f"Startworth: {start_worth}, Endworth: {end_worth}")
-    percent_changes = [((val / start_worth) - 1) * 100 for val in net_worths]
-    is_gain = is_profitable(history_data)
+    
+    # Startwert ist der erste Wert in der (jetzt chronologischen) Liste
+    start_worth = net_worths[0]
+    percent_changes = [((val / start_worth) - 1) * 100 if start_worth != 0 else 0 for val in net_worths]
+    
+    is_gain = net_worths[-1] > start_worth
     bg_color = 'rgba(0,0,0,0)'
 
     if dark_mode:
@@ -586,14 +590,18 @@ def create_portfolio_graph(history_data: list[dict], dark_mode: bool = False, li
         grid_color = 'rgba(230, 230, 230, 0.7)'
 
     fig = go.Figure()
+    # Haupt-Trace für den Depotwert (linke Achse)
     fig.add_trace(go.Scatter(
         x=dates, y=net_worths, mode='lines',
         line=dict(color=line_color, width=line_strength),
         hoverinfo='y+x', name='Depotwert'
     ))
+    # Unsichtbarer Trace für die Prozentwerte auf der zweiten Y-Achse
+    # Dies dient nur dazu, die Hover-Informationen zu steuern
     fig.add_trace(go.Scatter(
         x=dates, y=percent_changes, yaxis='y2',
-        visible=False, hoverinfo='none'
+        mode='lines', line=dict(width=0), # Linie unsichtbar machen
+        hoverinfo='skip' # Nicht im Hover anzeigen
     ))
 
     fig.update_layout(
@@ -607,15 +615,21 @@ def create_portfolio_graph(history_data: list[dict], dark_mode: bool = False, li
             showgrid=False,
             tickvals=[dates[0], dates[-1]],
             ticktext=[dates[0].strftime('%d. %b'), dates[-1].strftime('%d. %b')],
-            zeroline=False
+            zeroline=False,
+            fixedrange=True  # Verschieben/Zoomen der X-Achse deaktivieren
         ),
         yaxis=dict(
-            title='', tickprefix='€', gridcolor=grid_color, zeroline=False
+            title='', tickprefix='€', gridcolor=grid_color, zeroline=False,
+            fixedrange=True  # Verschieben/Zoomen der Y-Achse deaktivieren
         ),
         yaxis2=dict(
             title="", overlaying='y', side='right', showgrid=False,
-            ticksuffix='%', tickfont=dict(color=font_color), zeroline=False
-        )
+            ticksuffix='%', tickfont=dict(color=font_color), zeroline=False,
+            fixedrange=True, # Verschieben/Zoomen der zweiten Y-Achse deaktivieren
+            showticklabels=True # Ticks auf der rechten Achse anzeigen
+        ),
+        # Hover-Modus so einstellen, dass beide Achsen angezeigt werden
+        hovermode='x unified'
     )
     return fig.to_html(full_html=False, include_plotlyjs='cdn', config={'displayModeBar': False})
 
