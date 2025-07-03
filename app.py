@@ -557,6 +557,11 @@ def yfinance_ticker_is_valid(ticker_symbol: str) -> bool:
         # dass der Ticker nicht gültig ist.
         return False
 
+def is_profitable(history_data: list[dict]) -> bool:
+    net_worths = [item['net_worth'] for item in history_data]
+    start_worth = net_worths[-1]
+    end_worth = net_worths[0]
+    return end_worth > start_worth
 
 def create_portfolio_graph(history_data: list[dict], dark_mode: bool = False, line_strength:int=4) -> str | None:
     if not history_data or len(history_data) < 2:
@@ -568,7 +573,7 @@ def create_portfolio_graph(history_data: list[dict], dark_mode: bool = False, li
     end_worth = net_worths[0]
     #print(f"Startworth: {start_worth}, Endworth: {end_worth}")
     percent_changes = [((val / start_worth) - 1) * 100 for val in net_worths]
-    is_gain = end_worth > start_worth
+    is_gain = is_profitable(history_data)
     bg_color = 'rgba(0,0,0,0)'
 
     if dark_mode:
@@ -723,7 +728,8 @@ def dashboard_page():
     return render_template(
         'depot.html',
         depot=depot_data,
-        graph_html=graph_html
+        graph_html=graph_html,
+        is_profitable=is_profitable(history_data)
     )
 
 

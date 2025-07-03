@@ -17,15 +17,18 @@
 
 <div class="content-container">
     <div class="depot-header">
-        <div>
-            <h2>
-                <span id="total-value">€{{ "{:,.2f}".format(depot.total_net_worth) }}</span>
-                <small>Depotgesamtwert</small>
-            </h2>
+        <h1>
+            <span id="total-value" style="color: {% if is_profitable %}#198754{% else %}#dc3545{% endif %};">€{{ "{:,.2f}".format(depot.total_net_worth) }}</span>
+            <small style="font-size: 0.6em; color: #6c757d;">Gesamtwert</small>
+        </h1>
+        <div style="display: flex; align-items: center;">
+
+            <div style="margin-left: 40px;">
+                <button id="refresh-button" class="form-button">
+                    <span class="button-text">Aktualisieren</span>
+                </button>
+            </div>
         </div>
-        <button id="refresh-button" class="form-button">
-            <span class="button-text">Aktualisieren</span>
-        </button>
     </div>
 
     {% if graph_html %}
@@ -72,9 +75,18 @@
         </tbody>
     </table>
 
-    <div class="depot-summary">
-        <p>Portfolio-Wert: <strong><span id="portfolio-value">€{{ "{:,.2f}".format(depot.portfolio_value) }}</span></strong></p>
-        <p>Cash: <strong><span id="cash-balance">€{{ "{:,.2f}".format(depot.cash_balance) }}</span></strong></p>
+    <div class="depot-summary" style="display: flex; justify-content: space-between; align-items: center;">
+        <div>
+            <p>Portfolio-Wert: <strong><span id="portfolio-value">€{{ "{:,.2f}".format(depot.portfolio_value) }}</span></strong></p>
+            <p>Cash: <strong><span id="cash-balance">€{{ "{:,.2f}".format(depot.cash_balance) }}</span></strong></p>
+        </div>
+        <div>
+            {% if is_profitable %}
+                <img src="https://media1.giphy.com/media/v1.Y2lkPTc5MGI3NjExZnU2b243dm52amhocjFraGd1NXp4ZGNiODlibDhqemZyaTV0dHEwbCZlcD12MV9pbnRlcm5hbF9naWZfYnlfaWQmY3Q9Zw/YnkMcHgNIMW4Yfmjxr/giphy.gif" alt="Good Stonks" style="width: 173px; height: auto; border-radius: 8px;">
+            {% else %}
+                <img src="https://media.tenor.com/kkHx0jceFbQAAAAM/stonkseth-stonks.gif" alt="Bad Stonks" style="width: 173px; height: auto; border-radius: 8px;">
+            {% endif %}
+        </div>
     </div>
 </div>
 {% endblock %}
