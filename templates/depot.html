@@ -4,7 +4,6 @@
 
 {% block content %}
 <style>
-    /* ... (CSS Styles bleiben unverändert) ... */
     .depot-header {
         display: flex;
         justify-content: space-between;
@@ -12,6 +11,23 @@
         margin-bottom: 25px;
         padding-bottom: 20px;
         border-bottom: 1px solid #eee;
+    }
+    /* --- CSS für sortierbare Tabelle -- */
+    #positions-table thead th[data-sort] {
+        cursor: pointer;
+        position: relative;
+    }
+    #positions-table thead th[data-sort]::after {
+        content: ' \2195'; /* Up-Down Arrow */
+        opacity: 0.2;
+    }
+    #positions-table thead th[data-sort-order="asc"]::after {
+        content: ' \2191'; /* Up Arrow */
+        opacity: 1;
+    }
+    #positions-table thead th[data-sort-order="desc"]::after {
+        content: ' \2193'; /* Down Arrow */
+        opacity: 1;
     }
 </style>
 
@@ -42,11 +58,13 @@
     <table class="table table-hover" id="positions-table">
         <thead>
             <tr>
-                <th>Ticker</th>
-                <th style="text-align: right;">Menge</th>
-                <th style="text-align: right;">Avg. Kaufpreis</th>
-                <th style="text-align: right;">Akt. Kurs</th>
-                <th style="text-align: right;">Akt. Wert</th>
+                <th data-sort="ticker">Ticker</th>
+                <th data-sort="quantity" style="text-align: right;">Menge</th>
+                <th data-sort="avg_price" style="text-align: right;">Avg. Kaufpreis</th>
+                <th data-sort="current_price" style="text-align: right;">Akt. Kurs</th>
+                <th data-sort="current_value" style="text-align: right;">Akt. Wert</th>
+                <th data-sort="absolute_profit" style="text-align: right;">Gewinn/Verlust (Absolut)</th>
+                <th data-sort="relative_profit" style="text-align: right;">Gewinn/Verlust (Relativ)</th>
                 <th style="text-align: center;">Aktionen</th>
             </tr>
         </thead>
@@ -62,6 +80,12 @@
                 <td style="text-align: right;">
                     {% if pos.current_value %}€{{ "{:,.2f}".format(pos.current_value) }}{% else %}<span class="text-muted">N/A</span>{% endif %}
                 </td>
+                <td style="text-align: right; color: {% if pos.absolute_profit > 0 %}#198754{% elif pos.absolute_profit < 0 %}#dc3545{% else %}inherit{% endif %};">
+                    {% if pos.absolute_profit is not none %}€{{ "{:,.2f}".format(pos.absolute_profit) }}{% else %}<span class="text-muted">N/A</span>{% endif %}
+                </td>
+                <td style="text-align: right; color: {% if pos.relative_profit > 0 %}#198754{% elif pos.relative_profit < 0 %}#dc3545{% else %}inherit{% endif %};">
+                    {% if pos.relative_profit is not none %}{{ "{:.2f}".format(pos.relative_profit) }}%{% else %}<span class="text-muted">N/A</span>{% endif %}
+                </td>
                 <td style="text-align: center;">
                     <a href="{{ url_for('stock_detail_page', ticker_symbol=pos.ticker) }}" class="form-button" style="padding: 5px 10px; font-size: 0.85em; background-color: #6c757d;">Details</a>
                     <a href="{{ url_for('trade_page', ticker_symbol=pos.ticker) }}" class="form-button" style="padding: 5px 10px; font-size: 0.85em;">Handeln</a>
@@ -69,7 +93,7 @@
             </tr>
             {% else %}
             <tr>
-                <td colspan="6" style="text-align: center;">Sie haben noch keine Positionen in Ihrem Depot.</td>
+                <td colspan="8" style="text-align: center;">Sie haben noch keine Positionen in Ihrem Depot.</td>
             </tr>
             {% endfor %}
         </tbody>
@@ -97,43 +121,90 @@ document.addEventListener('DOMContentLoaded', function() {
     const refreshButton = document.getElementById('refresh-button');
     const buttonText = refreshButton.querySelector('.button-text');
 
-    refreshButton.addEventListener('click', function() {
-        // Button deaktivieren und Lade-Zustand anzeigen
-        this.disabled = true;
-        buttonText.textContent = 'Lädt...';
-        const originalBg = this.style.backgroundColor;
+    if(refreshButton) {
+        refreshButton.addEventListener('click', function() {
+            this.disabled = true;
+            buttonText.textContent = 'Lädt...';
+            const originalBg = this.style.backgroundColor;
 
-        fetch("{{ url_for('api_refresh_depot') }}", {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' }
-        })
-        .then(response => response.json().then(data => ({ ok: response.ok, status: response.status, body: data })))
-        .then(result => {
-             // === NEUES FEEDBACK OHNE SEITEN-NEULADUNG ===
-             if (result.ok) {
-                buttonText.textContent = result.body.message;
-                this.style.backgroundColor = '#198754'; // Grün für Erfolg
-                // Optional: Seite nach Erfolg neu laden, um Werte zu aktualisieren
-                setTimeout(() => window.location.reload(), 1000);
-             } else {
-                buttonText.textContent = result.body.message || 'Fehler';
-                this.style.backgroundColor = '#dc3545'; // Rot für Fehler
-             }
-        })
-        .catch(error => {
-            console.error('Fetch-Fehler:', error);
-            buttonText.textContent = 'Netzwerkfehler!';
-            this.style.backgroundColor = '#dc3545';
-        })
-        .finally(() => {
-            // Button nach 3 Sekunden wieder zurücksetzen
-            setTimeout(() => {
-                this.disabled = false;
-                buttonText.textContent = 'Aktualisieren';
-                this.style.backgroundColor = originalBg;
-            }, 3000);
+            fetch("{{ url_for('api_refresh_depot') }}", {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' }
+            })
+            .then(response => response.json().then(data => ({ ok: response.ok, status: response.status, body: data })))
+            .then(result => {
+                 if (result.ok) {
+                    buttonText.textContent = result.body.message;
+                    this.style.backgroundColor = '#198754';
+                    setTimeout(() => window.location.reload(), 1000);
+                 } else {
+                    buttonText.textContent = result.body.message || 'Fehler';
+                    this.style.backgroundColor = '#dc3545';
+                 }
+            })
+            .catch(error => {
+                console.error('Fetch-Fehler:', error);
+                buttonText.textContent = 'Netzwerkfehler!';
+                this.style.backgroundColor = '#dc3545';
+            })
+            .finally(() => {
+                setTimeout(() => {
+                    this.disabled = false;
+                    buttonText.textContent = 'Aktualisieren';
+                    this.style.backgroundColor = originalBg;
+                }, 3000);
+            });
         });
-    });
+    }
+
+    // --- Verbesserte Tabellen-Sortierlogik ---
+    const table = document.getElementById('positions-table');
+    if (table) {
+        const headers = table.querySelectorAll('thead th[data-sort]');
+        const tbody = table.querySelector('tbody');
+
+        headers.forEach(header => {
+            header.addEventListener('click', () => {
+                const sortOrder = header.dataset.sortOrder === 'asc' ? 'desc' : 'asc';
+                
+                // Reset other headers
+                headers.forEach(h => h.removeAttribute('data-sort-order'));
+                header.dataset.sortOrder = sortOrder;
+
+                const rows = Array.from(tbody.querySelectorAll('tr'));
+                const colIndex = header.cellIndex;
+
+                rows.sort((a, b) => {
+                    let valA = a.cells[colIndex].textContent.trim();
+                    let valB = b.cells[colIndex].textContent.trim();
+
+                    // Handle N/A
+                    const isNA_A = valA === 'N/A';
+                    const isNA_B = valB === 'N/A';
+                    if (isNA_A && isNA_B) return 0;
+                    if (isNA_A) return 1;
+                    if (isNA_B) return -1;
+
+                    // Parse numbers (handles €, %, German format)
+                    const numA = parseFloat(valA.replace(/[^0-9,-]+/g, '').replace('.', '').replace(',', '.'));
+                    const numB = parseFloat(valB.replace(/[^0-9,-]+/g, '').replace('.', '').replace(',', '.'));
+
+                    let compareA = !isNaN(numA) ? numA : valA;
+                    let compareB = !isNaN(numB) ? numB : valB;
+
+                    if (compareA < compareB) {
+                        return sortOrder === 'asc' ? -1 : 1;
+                    }
+                    if (compareA > compareB) {
+                        return sortOrder === 'asc' ? 1 : -1;
+                    }
+                    return 0;
+                });
+
+                rows.forEach(row => tbody.appendChild(row));
+            });
+        });
+    }
 });
 </script>
 {% endblock %}

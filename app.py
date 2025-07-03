@@ -724,7 +724,6 @@ def dashboard_page():
     graph_html = create_portfolio_graph(history_data, dark_mode=dark_mode_status)
 
     # Die `conn` wird durch @app.teardown_appcontext geschlossen
-
     return render_template(
         'depot.html',
         depot=depot_data,
