@@ -56,6 +56,7 @@ def get_db():
 # if name is main gezwungene alternative
 with app.app_context():
     local_conn = get_db()
+    #LeaderboardEndpoint.insert_all_current_net_worths(local_conn)
     local_conn.commit()
     local_conn.close()
 

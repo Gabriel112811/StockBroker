@@ -43,7 +43,6 @@ class DepotEndpoint:
             try:
                 # Batch-Download für bessere Performance
                 data = yf.download(tickers, period="1d", progress=False, group_by='ticker', auto_adjust=True)
-
                 for ticker, quantity, avg_price in positions_raw:
                     current_price = None
                     current_value = None
@@ -52,6 +51,7 @@ class DepotEndpoint:
                         current_value = quantity * current_price
                         if current_value is None:
                             prices_not_complete = True
+                        print(current_value, prices_not_complete)
                         portfolio_value += current_value
 
                     positions_detailed.append({
@@ -59,7 +59,7 @@ class DepotEndpoint:
                         "quantity": quantity,
                         "average_purchase_price": avg_price,
                         "current_price": current_price,
-                        "current_value": current_value
+                        "current_value": current_value,
                     })
 
             except Exception as e:
@@ -68,11 +68,21 @@ class DepotEndpoint:
                 for ticker, quantity, avg_price in positions_raw:
                     positions_detailed.append({
                         "ticker": ticker, "quantity": quantity, "average_purchase_price": avg_price,
-                        "current_price": None, "current_value": None
+                        "current_price": None, "current_value": None,
                     })
 
         # 4. Gesamtergebnis zusammenstellen
         total_net_worth = cash_balance + portfolio_value
+
+        prices_missing = False
+        for position in positions_detailed:
+            if position.get("current_price") is None:
+                prices_missing = True
+                break
+            if position.get("current_value") is None:
+                prices_missing = True
+                break
+
 
         return {
             "user_id": user_id,
@@ -80,7 +90,7 @@ class DepotEndpoint:
             "portfolio_value": portfolio_value,
             "total_net_worth": total_net_worth,
             "positions": positions_detailed,
-            "prices_not_complete": prices_not_complete,
+            "prices_missing": prices_missing
         }
 
     @staticmethod

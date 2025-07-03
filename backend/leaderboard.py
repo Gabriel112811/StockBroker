@@ -134,10 +134,14 @@ class LeaderboardEndpoint:
             except YFPricesMissingError as e:
                 print(f"Versuch {i + 1}/{tries} fehlgeschlagen: {e}")
                 continue
+            except Exception as e:
+                print(f"Versuch {i + 1}/{tries} fehlgeschlagen: {e}")
+                continue
             if depot_data is None:
                 continue
-            if depot_data.get("prices_not_complete") is True:
+            if depot_data.get("prices_missing"):
                 continue
+
             break
         else:
             return False
