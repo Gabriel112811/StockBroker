@@ -462,7 +462,7 @@ def generate_stock_plotly_chart(ticker_symbol, period="1y", interval="1d", quali
             grid_color = 'rgba(255, 255, 255, 0.1)' if dark_mode else 'rgba(0, 0, 0, 0.1)'
             
             # Farben für Candlesticks definieren
-            increasing_color = '#00C805' if dark_mode else '#198754'
+            increasing_color = '#1a8754'
             decreasing_color = '#FF4136' if dark_mode else '#dc3545'
 
             fig = go.Figure()
@@ -565,7 +565,6 @@ def is_profitable(history_data: list[dict]) -> bool:
     net_worths = [item['net_worth'] for item in history_data]
     start_worth = net_worths[0]
     end_worth = net_worths[-1]
-    print(f"start: {start_worth}, endworth:{end_worth}, {end_worth > start_worth}")
     return end_worth > start_worth
 
 def create_portfolio_graph(history_data: list[dict], dark_mode: bool = False, line_strength:int=4) -> str | None:
@@ -586,11 +585,11 @@ def create_portfolio_graph(history_data: list[dict], dark_mode: bool = False, li
 
     if dark_mode:
         font_color = '#D3D3D3'
-        line_color = '#00C805' if is_gain else '#FF4136'
+        line_color = '#1a8754' if is_gain else '#FF4136'
         grid_color = 'rgba(255, 255, 255, 0.1)'
     else:
         font_color = '#444'
-        line_color = '#198754' if is_gain else '#dc3545'
+        line_color = '#1a8754' if is_gain else '#dc3545'
         grid_color = 'rgba(230, 230, 230, 0.7)'
 
     fig = go.Figure()
