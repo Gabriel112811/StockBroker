@@ -200,14 +200,14 @@ def verify_email_page():
             flash('Bitte gib den Code aus der E-Mail ein.', 'error')
         else:
             if do_email_token_verification(token):
-                return redirect(url_for('dashboard_page'))
+                return redirect(url_for('search_stock_page')) #User direkt zu suche schicken, da das im prinzip die landingpage ist
     return render_template('auth/verify_email.html')
 
 @app.route('/verify/<token>')
 def verify_email_from_link(token) -> redirect:
     """Verarbeitet den Token direkt aus dem E-Mail-Link."""
     if do_email_token_verification(token):
-        return redirect(url_for('dashboard_page'))
+        return redirect(url_for('search_stock_page')) #User direkt zu suche schicken, da das im prinzip die landingpage ist
     else:
         return redirect(url_for('register_page'))
 
