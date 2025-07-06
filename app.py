@@ -1,9 +1,8 @@
-#// app.py
-
+#app.py
 from flask import Flask, render_template, request, redirect, url_for, flash, session, g, jsonify
 import yfinance as yf
 import plotly.graph_objects as go
-import os, math
+import math
 import json
 import requests
 import sqlite3
@@ -11,15 +10,16 @@ from functools import wraps
 from datetime import datetime, timedelta
 
 # Lokale Imports
-from backend.accounts_to_database import ENDPOINT as AccountEndpoint, ENDPOINT
+from backend.accounts_to_database import AccountEndpoint
 from backend.accounts_to_database import UTILITIES
-from backend.trading import TradingEndpoint # Geänderter Import
+from backend.trading import TradingEndpoint
 from backend.leaderboard import LeaderboardEndpoint
 from backend.depot_system import DepotEndpoint
 from backend.tokens import TokenEndpoint
 from backend.accounts_to_database import Settings
 
 app = Flask(__name__)
+
 ALPHA_VANTAGE_API_KEY = None
 DATABASE_FILE = "backend/StockBroker.db"
 
@@ -29,8 +29,22 @@ def __init__():
         with open('keys.json', 'r') as f:
             keys = json.load(f)
             secret_key = keys.get('APP_SECRET')
-            app.secret_key = secret_key
-            ALPHA_VANTAGE_API_KEY = keys.get('alpha_vantage_api_key')
+            ALPHA_VANTAGE_API_KEY = keys.get('ALPHA_VANTAGE_API_KEY')
+
+        if not secret_key:
+            print("WARNUNG: App_Secret nicht in keys.json gefunden oder Datei fehlerhaft.")
+            raise ValueError("App_Secret nicht gefunden")
+
+        if len(secret_key) < 8:
+            print("WARNUNG: App_Secret muss mindestens 8 Zeichen lang sein.")
+            raise ValueError("App_Secret ist zu kurz")
+
+        app.secret_key = secret_key
+
+        if not ALPHA_VANTAGE_API_KEY:
+            print("WARNUNG: Alpha Vantage API Key nicht in keys.json gefunden oder Datei fehlerhaft.")
+            raise ValueError("Alpha Vantage API Key nicht gefunden")
+
     except FileNotFoundError:
         print("WARNUNG: keys.json nicht gefunden.")
         raise
@@ -38,34 +52,24 @@ def __init__():
         print("WARNUNG: keys.json ist kein valides JSON.")
         raise
 
-    if not secret_key:
-        print("WARNUNG: App_Secret nicht in keys.json gefunden oder Datei fehlerhaft.")
-        raise
-
-    if not ALPHA_VANTAGE_API_KEY:
-        print("WARNUNG: Alpha Vantage API Key nicht in keys.json gefunden oder Datei fehlerhaft.")
-        raise
-
 __init__()
 
-def get_db():
+def get_db() -> sqlite3.Connection:
     db = getattr(g, '_database', None)
     if db is None:
         db = g._database = sqlite3.connect(DATABASE_FILE)
     return db
-# if name is main gezwungene alternative
-with app.app_context():
-    local_conn = get_db()
-    #LeaderboardEndpoint.insert_all_current_net_worths(local_conn)
-    local_conn.commit()
-    local_conn.close()
 
 @app.teardown_appcontext
 def close_connection(exception):
-    """Schließt die Datenbankverbindung am Ende des Requests."""
+    """Schließt die DB-Verbindung. Committet bei Erfolg, macht Rollback bei Fehler."""
     db = getattr(g, '_database', None)
     if db is not None:
-        db.close()
+        if exception is None:
+            db.commit()  # Bei Erfolg: Änderungen speichern.
+        else:
+            db.rollback() # Bei Fehler: Änderungen verwerfen.
+        db.close() # Verbindung immer schließen.
 
 @app.before_request
 def load_user_settings():
@@ -77,6 +81,7 @@ def load_user_settings():
 
 # --- eigener Decorator ---
 def login_required(f):
+    """Hiermit können funktionen dekoriert werden, die nur für angemeldete Benutzer zugänglich sein sollen."""
     @wraps(f)
     def decorated_function(*args, **kwargs):
         if 'user_id' not in session:
@@ -92,7 +97,7 @@ def cancel_order_route(order_id):
     db = get_db()
     result = TradingEndpoint.cancel_order(db, session['user_id'], order_id)
     if result.get('success'):
-        db.commit()
+        # db.commit() # Entfällt, da @app.teardown_appcontext dies übernimmt
         flash(result.get('message'), 'success')
     else:
         flash(result.get('message'), 'error')
@@ -108,9 +113,21 @@ AVAILABLE_PERIODS = [
 AVAILABLE_QUALITIES = [
     ("high", "Hoch"), ("normal", "Normal"), ("low", "Niedrig")
 ]
+#-//-
 
 def do_login(conn, identifier:str=None , password:str=None, instant_login_result:dict=None) -> bool:
-    result = AccountEndpoint.login(conn, identifier, password) if not instant_login_result else instant_login_result
+    """
+        Diese Funktion meldet den Benutzer in der Session an. Entweder über AccountEndpoint oder per user_id.
+        Der direkte Login darf nur verwendet werden, wenn es den Nutzer sicher gibt und sichergestellt ist,
+        das er die Anfrage stellt.
+        Das ist zum Beispiel nach dem Verifizieren der E-Mail möglich, da das Token 1:1 mit dem Nutzer verknüpft ist.
+        """
+
+    if instant_login_result is None:
+        result = AccountEndpoint.login(conn, identifier, password)
+    else:
+        result = instant_login_result
+
     if result.get('success'):
         session['user_id'] = result.get('user_id')
         session['user_email'] = result.get('email')
@@ -119,20 +136,20 @@ def do_login(conn, identifier:str=None , password:str=None, instant_login_result
         else:
             session['username'] = result.get('username')
         flash(result.get('message', 'Login erfolgreich!'), 'success')
-        conn.commit()
+        # conn.commit() # Entfällt, da @app.teardown_appcontext dies übernimmt
         return True
     else:
         flash(result.get('message', 'Login fehlgeschlagen.'), 'error')
         return False
 
-#--AUTH--
 @app.route('/login', methods=['GET', 'POST'])
 def login_page():
-    if 'user_id' in session:
+    if 'user_id' in session: #schon angemeldet
         return redirect(url_for('dashboard_page'))
 
     form_data = {}
     if request.method == 'POST':
+        #Felder auslesen
         identifier = request.form.get('identifier', '').strip()
         password = request.form.get('password', '').strip()
         form_data['identifier'] = identifier
@@ -148,31 +165,32 @@ def login_page():
 
 @app.route('/register', methods=['GET', 'POST'])
 def register_page():
-    if 'user_id' in session:
+    if 'user_id' in session:#schon angemeldet
         return redirect(url_for('dashboard_page'))
 
     form_data = {}
     if request.method == 'POST':
+        #Formular auslesen
         email = request.form.get('email', '').strip()
         username = request.form.get('username', '').strip()
         password = request.form.get('password', '').strip()
         password_confirm = request.form.get('password_confirm', '').strip()
-        instant_token = request.form.get('instant_register_token', '').strip()
+        instant_token = request.form.get('instant_register_token', '').strip() #INOP
 
         form_data['email'] = email
         form_data['username'] = username
 
-        if not email or not username or not password or not password_confirm:
+        if not all((email, username, password, password_confirm)):
             flash('Bitte alle Felder ausfüllen.', 'error')
         elif password != password_confirm:
             flash('Die Passwörter stimmen nicht überein.', 'error')
         else:
             conn = get_db()
             result = AccountEndpoint.create_account(conn, password, email, username,
-                                                    instant_register_token=instant_token)
+                                                    instant_register_token=instant_token) #INOP
 
             if result.get('success'):
-                conn.commit()
+                # conn.commit() # Entfällt, da @app.teardown_appcontext dies jetzt übernimmt
                 if result.get('email_verification_required'):
                     # Leite auf eine Seite weiter, die den User anweist, seine E-Mails zu prüfen
                     flash(result.get('message'), 'info')
@@ -212,13 +230,14 @@ def verify_email_from_link(token) -> redirect:
         return redirect(url_for('register_page'))
 
 def do_email_token_verification(token) -> bool:
+    """Testet das Token, flasht das Ergebnis und gibt es in bool zurück."""
     conn = get_db()
     result = AccountEndpoint.verify_email_delete_token(conn, token)
-    conn.commit()
+    # conn.commit() # Entfällt, da @app.teardown_appcontext dies übernimmt
     if result.get('success'):
         user_id = result.get('user_id')
         LeaderboardEndpoint.insert_current_net_worth_for_user(conn, user_id)
-        conn.commit()
+        # conn.commit() # Entfällt, da @app.teardown_appcontext dies übernimmt
         if do_login(conn, UTILITIES.get_username(conn, user_id), instant_login_result=result):
             return True
     else:
@@ -243,9 +262,8 @@ def reset_password_request_page():
             flash('Bitte gib deine E-Mail-Adresse ein.', 'error')
         else:
             conn = get_db()
-            # Diese Funktion sendet jetzt die E-Mail
             AccountEndpoint.request_password_reset(conn, email)
-            conn.commit()  # Wichtig, damit der Token gespeichert wird
+            # conn.commit()  # Wichtig, damit der Token gespeichert wird -> Übernimmt teardown
             flash('Wenn ein Konto mit dieser E-Mail existiert, wurde eine Anleitung gesendet.', 'info')
             # Man leitet den User direkt zur Token-Eingabe
             return redirect(url_for('reset_password_enter_token_page'))
@@ -255,7 +273,6 @@ def reset_password_request_page():
 @app.route('/reset-password/<token>', methods=['GET', 'POST'])
 def reset_password_confirm_page(token):
     conn = get_db()
-    # verify_reset_token gibt jetzt ein Dictionary zurück
     token_verification = TokenEndpoint.verify_but_not_consume_password_token(conn, token)
     if not token_verification.get('success'):
         # Token ist bereits konsumiert oder ungültig, commit ist nicht nötig
@@ -275,7 +292,7 @@ def reset_password_confirm_page(token):
         else:
             #conn wird oben schon gemacht
             result = AccountEndpoint.reset_password_with_token(conn, token, new_password)
-            conn.commit()
+            # conn.commit() # Entfällt, da @app.teardown_appcontext dies übernimmt
             if result.get('success'):
                 username = UTILITIES.get_username(conn, result["user_id"])
                 if do_login(conn, identifier=username, password=new_password):
@@ -296,9 +313,9 @@ def reset_password_enter_token_page():
             return redirect(url_for('reset_password_confirm_page', token=token))
     return render_template('auth/reset_enter_token.html')
 #//--AUTH--
+#<-------KI------->
 
-
-def get_stock_basic_info_yfinance(ticker_symbol): # Renamed to avoid conflict
+def get_stock_basic_info_yfinance(ticker_symbol):
     try:
         stock = yf.Ticker(ticker_symbol)
         info = stock.info
@@ -313,28 +330,26 @@ def get_stock_basic_info_yfinance(ticker_symbol): # Renamed to avoid conflict
     except Exception as e:
         return None, f"Fehler beim Abrufen der Basisinformationen für '{ticker_symbol}' (yfinance): {str(e)}"
 
-def search_alpha_vantage(keywords):
-    """Search for stock symbols using Alpha Vantage API."""
+def search_alpha_vantage(keywords) -> tuple:
+    """Suche mit Alpha Vantage API."""
     if not ALPHA_VANTAGE_API_KEY:
-        return None, "Alpha Vantage API Key nicht konfiguriert."
+        return None, "Bitte die Entwickler kontaktieren."
     if not keywords:
-        return [], None # No keywords, no results, no error
+        return [], None
 
     url = f"https://www.alphavantage.co/query?function=SYMBOL_SEARCH&keywords={keywords}&apikey={ALPHA_VANTAGE_API_KEY}"
     try:
         response = requests.get(url, timeout=10)
-        response.raise_for_status()  # Raise an exception for HTTP errors
+        response.raise_for_status()  # Exception für HTTP-Errors
         data = response.json()
         if "bestMatches" in data:
-            # Filter out results that are not Common Stock or ETF, or from non-US exchanges if desired
-            # For now, return all matches
             return data["bestMatches"], None
-        elif "Note" in data: # API limit reached or other API note
+        elif "Note" in data: # API-Notiz
              return None, f"Alpha Vantage API Hinweis: {data.get('Note')}"
         elif "Error Message" in data:
              return None, f"Alpha Vantage API Fehler: {data.get('Error Message')}"
         else:
-            return [], None # No matches or unexpected response
+            return [], None # Keine Treffer
     except requests.exceptions.RequestException as e:
         return None, f"Netzwerkfehler bei der Verbindung zu Alpha Vantage: {str(e)}"
     except json.JSONDecodeError:
@@ -342,7 +357,7 @@ def search_alpha_vantage(keywords):
     except Exception as e:
         return None, f"Unbekannter Fehler bei der Alpha Vantage Suche: {str(e)}"
 
-def get_stock_detailed_data(ticker_symbol):
+def get_stock_detailed_data(ticker_symbol) -> dict:
     stock_data = {'ticker': ticker_symbol, 'error': None}
     try:
         stock = yf.Ticker(ticker_symbol)
@@ -359,15 +374,20 @@ def get_stock_detailed_data(ticker_symbol):
         stock_data['info'] = info
         try:
             stock_data['financials_html'] = stock.financials.to_html(classes='table table-sm table-striped table-hover', border=0) if not stock.financials.empty else "Keine Finanzdaten verfügbar."
-        except Exception:
+        except Exception as e:
+            print(f"Fehler beim Laden der Finanzdaten für {ticker_symbol}: {e}")
             stock_data['financials_html'] = "Finanzdaten konnten nicht geladen werden."
 
         try:
             stock_data['major_holders_html'] = stock.major_holders.to_html(classes='table table-sm table-striped table-hover', border=0) if stock.major_holders is not None and not stock.major_holders.empty else "Keine Daten zu Haupteignern verfügbar."
-        except Exception: stock_data['major_holders_html'] = "Daten zu Haupteignern konnten nicht geladen werden."
+        except Exception as e:
+            print(f"Fehler beim Laden der Haupteigner für {ticker_symbol}: {e}")
+            stock_data['major_holders_html'] = "Daten zu Haupteignern konnten nicht geladen werden."
         try:
             stock_data['recommendations_html'] = stock.recommendations.tail(5).to_html(classes='table table-sm table-striped table-hover', border=0) if stock.recommendations is not None and not stock.recommendations.empty else "Keine Empfehlungen verfügbar."
-        except Exception: stock_data['recommendations_html'] = "Empfehlungen konnten nicht geladen werden."
+        except Exception as e:
+            print(f"Fehler beim Laden der Empfehlungen für {ticker_symbol}: {e}")
+            stock_data['recommendations_html'] = "Empfehlungen konnten nicht geladen werden."
 
         quote_info = {
             "Preis": info.get("currentPrice", info.get("regularMarketPrice", "N/A")),
@@ -443,7 +463,6 @@ def generate_stock_plotly_chart(ticker_symbol, period="1y", interval="1d", quali
     chart_html = None
     error_msg = quality_note if quality_note else None
     company_name = ticker_symbol
-
     try:
         stock = yf.Ticker(ticker_symbol)
         info_temp = stock.info
@@ -462,8 +481,8 @@ def generate_stock_plotly_chart(ticker_symbol, period="1y", interval="1d", quali
             grid_color = 'rgba(255, 255, 255, 0.1)' if dark_mode else 'rgba(0, 0, 0, 0.1)'
             
             # Farben für Candlesticks definieren
-            increasing_color = '#1a8754'
-            decreasing_color = '#FF4136' if dark_mode else '#dc3545'
+            increasing_color:str = '#1a8754'
+            decreasing_color:str = '#FF4136' if dark_mode else '#dc3545'
 
             fig = go.Figure()
             fig.add_trace(go.Candlestick(x=hist_data.index,
@@ -471,7 +490,9 @@ def generate_stock_plotly_chart(ticker_symbol, period="1y", interval="1d", quali
                                          low=hist_data['Low'], close=hist_data['Close'],
                                          name=f'{ticker_symbol}',
                                          increasing_line_color=increasing_color,
-                                         decreasing_line_color=decreasing_color))
+                                         decreasing_line_color=decreasing_color
+                            )
+            )
 
             period_display = next((p[1] for p in AVAILABLE_PERIODS if p[0] == period), period)
             interval_map_for_display = {"1m": "1 Min", "2m": "2 Min", "5m": "5 Min", "15m": "15 Min",
@@ -533,7 +554,6 @@ def generate_stock_plotly_chart(ticker_symbol, period="1y", interval="1d", quali
         error_msg = (error_msg + " | " if error_msg and error_msg not in current_err else "") + current_err
 
     return chart_html, error_msg, company_name
-
 
 def yfinance_ticker_is_valid(ticker_symbol: str) -> bool:
     """
@@ -636,11 +656,11 @@ def create_portfolio_graph(history_data: list[dict], dark_mode: bool = False, li
     )
     return fig.to_html(full_html=False, include_plotlyjs='cdn', config={'displayModeBar': False})
 
-
-def get_or_generate_widget_chart(conn, ticker: str, dark_mode: bool) -> str | None:
+def get_or_generate_widget_chart(conn, ticker: str, dark_mode: bool) -> tuple[str | None, str | None]:
     """
-    Prüft den Cache. Wenn kein gültiger Chart vorhanden ist, wird er generiert, 
-    gespeichert und zurückgegeben.
+    Prüft zuerst, ob der Chart im Cache vorhanden und nicht älter als 24h ist.
+    Wenn kein gültiger Chart vorhanden ist, wird er generiert, gespeichert und zurückgegeben.
+    Gibt ein Tupel aus (chart_html, company_name) zurück.
     """
     cursor = conn.cursor()
     twenty_four_hours_ago = datetime.now() - timedelta(hours=24)
@@ -648,15 +668,14 @@ def get_or_generate_widget_chart(conn, ticker: str, dark_mode: bool) -> str | No
 
     # 1. Cache prüfen
     cursor.execute("""
-        SELECT chart_html FROM cached_charts 
-        WHERE ticker = ? AND dark_mode = ? AND last_updated > ?
-    """, (ticker, dark_mode_int, twenty_four_hours_ago))
+        SELECT chart_html, company_name FROM cached_charts 
+        WHERE ticker = ? AND dark_mode = ? AND last_updated > ?""", (ticker, dark_mode_int, twenty_four_hours_ago))
     result = cursor.fetchone()
     if result:
-        return result[0]
+        return result[0], result[1]
 
     # 2. Wenn nicht im Cache: Generieren, speichern und zurückgeben
-    chart_html, error_msg, _ = generate_stock_plotly_chart(
+    chart_html, error_msg, company_name = generate_stock_plotly_chart(
         ticker_symbol=ticker,
         period="1y",
         interval="1d",
@@ -669,15 +688,14 @@ def get_or_generate_widget_chart(conn, ticker: str, dark_mode: bool) -> str | No
 
     if chart_html and not error_msg:
         cursor.execute("""
-            INSERT OR REPLACE INTO cached_charts (ticker, dark_mode, chart_html, last_updated)
-            VALUES (?, ?, ?, ?)
-        """, (ticker, dark_mode_int, chart_html, datetime.now()))
-        conn.commit()
-        return chart_html
+            INSERT OR REPLACE INTO cached_charts (ticker, dark_mode, chart_html, company_name, last_updated)
+            VALUES (?, ?, ?, ?, ?)""", (ticker, dark_mode_int, chart_html, company_name, datetime.now()))
+        # conn.commit() # Entfällt, da @app.teardown_appcontext dies übernimmt
+        return chart_html, company_name
     elif error_msg:
         print(f"[Chart-Gen] Fehler beim Generieren des Charts für {ticker}: {error_msg}")
-        return None
-    return None
+        return None, None
+    return None, None
 
 def update_popular_charts_cache(conn):
     """
@@ -697,10 +715,11 @@ def update_popular_charts_cache(conn):
         get_or_generate_widget_chart(conn, ticker, dark_mode=False)
     print("[Cache-Job] Proaktives Update abgeschlossen.")
 
+#<//-------KI-------//>
+
 
 @app.route('/', methods=['GET'])
 def landing_page():
-    # Redirect to search page instead of login if not logged in, or dashboard if logged in
     if 'user_id' in session:
         return redirect(url_for('dashboard_page'))
     return redirect(url_for('search_stock_page'))
@@ -709,6 +728,7 @@ def landing_page():
 @app.route('/dashboard')
 @login_required
 def dashboard_page():
+    """Die Depot-Seite"""
     conn = get_db()
     user_id = session['user_id']
 
@@ -725,22 +745,18 @@ def dashboard_page():
         LeaderboardEndpoint.insert_current_net_worth_for_user(conn, user_id)
         history_data = LeaderboardEndpoint.fetch_and_group_leaderboard(conn)
 
-    if session.get('user_id') in history_data.keys():
-        history_data = history_data[session.get('user_id')]
-    else:
-        history_data = [
-            {"date": datetime.now().strftime('%Y-%m-%d %H:%M:%S'), "net_worth": 50000.0},
-            {"date": datetime.now().strftime('%Y-%m-%d %H:%M:%S'), "net_worth": 50000.0},
-        ]
-
+    # Sicherer Zugriff auf die Benutzer-spezifischen Daten mit Fallback, falls keine Historie vorhanden.
+    history_data = history_data.get(session.get('user_id'), [
+        {"date": datetime.now().strftime('%Y-%m-%d %H:%M:%S'), "net_worth": 50000.0},
+        {"date": datetime.now().strftime('%Y-%m-%d %H:%M:%S'), "net_worth": 50000.0},
+    ])
 
     # NEU: Dark-Mode-Status aus dem globalen 'g'-Objekt holen
     dark_mode_status = g.user_settings and g.user_settings.get('dark_mode') == 1
 
-    # Graph-HTML mit der Dark-Mode-Einstellung erstellen
     graph_html = create_portfolio_graph(history_data, dark_mode=dark_mode_status)
 
-    # Die `conn` wird durch @app.teardown_appcontext geschlossen
+    # Die `conn` wird hoffentlich durch @app.teardown_appcontext geschlossen
     return render_template(
         'depot.html',
         depot=depot_data,
@@ -753,22 +769,23 @@ def dashboard_page():
 def search_stock_page():
     query = request.args.get('keywords', '').strip()
     results, error = None, None
-    popular_stocks_charts = {}
-
-    conn = get_db()
     dark_mode_status = g.user_settings and g.user_settings.get('dark_mode')
 
+    conn = get_db()
+
+    #Die drei Aktien, in denen gerade alle Nutzer zusammen am meisten Geld investiert haben
     popular_stocks = DepotEndpoint.get_most_popular_stocks(conn)
+
     if popular_stocks:
         chart_period = "1y"
         period_display_text = next((p[1] for p in AVAILABLE_PERIODS if p[0] == chart_period), chart_period)
 
+        popular_stocks_charts = {}
         for ticker, total_value in popular_stocks.items():
-            chart_html = get_or_generate_widget_chart(conn, ticker, dark_mode_status)
-            basic_info, _ = get_stock_basic_info_yfinance(ticker)
+            chart_html, company_name = get_or_generate_widget_chart(conn, ticker, dark_mode_status)
             popular_stocks_charts[ticker] = {
                 'chart': chart_html,
-                'name': basic_info.get('name', ticker) if basic_info else ticker,
+                'name': company_name if company_name else ticker, # Fallback auf Ticker
                 'period_display': period_display_text,
                 'total_value': total_value
             }
@@ -857,7 +874,7 @@ def trade_page(ticker_symbol):
             result = TradingEndpoint.place_order(conn, session['user_id'], order_details)
 
             if result.get('success'):
-                conn.commit()
+                # conn.commit() # Entfällt, da @app.teardown_appcontext dies übernimmt
                 flash(result.get('message'), 'success')
                 return redirect(url_for('my_orders_page'))
             else:
@@ -930,8 +947,6 @@ def leaderboard_page():
     total_users = LeaderboardEndpoint.count_users(conn)
     total_pages = math.ceil(total_users / page_size)
 
-    conn.close()
-
     # --- Scheduler-Logik für die Anzeige der nächsten Aktualisierung (wie zuvor besprochen) ---
     update_interval_minutes = 10  # Zeigt auf die nächste durch 10 teilbare Minute
     now = datetime.now()
@@ -984,10 +999,9 @@ def api_refresh_depot():
 @login_required
 def my_orders_page():
     db = get_db()
-    all_orders = TradingEndpoint.get_user_orders(db, session['user_id'])
-
-    open_orders = [order for order in all_orders if order['status'] == 'OPEN']
-    closed_orders = [order for order in all_orders if order['status'] != 'OPEN']
+    # Effizientere Abfragen, die direkt die Datenbank filtern
+    open_orders = TradingEndpoint.get_user_orders(db, session['user_id'], status_filter='OPEN')
+    closed_orders = TradingEndpoint.get_user_orders(db, session['user_id'], status_filter='CLOSED')
 
     # Aktuelle Preise für offene Aufträge in einem Batch holen
     prices = {}
@@ -1038,7 +1052,7 @@ def settings_page():
             else:
                 flash(f"Du kannst deinen Namen erst wieder am {change_status['next_change_date']} ändern.", 'error')
         
-        conn.commit()
+        # conn.commit() # Entfällt, da @app.teardown_appcontext dies übernimmt
         return redirect(url_for('settings_page'))
 
     # GET Request

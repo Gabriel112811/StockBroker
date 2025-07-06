@@ -2,7 +2,7 @@ from app import app, get_db, update_popular_charts_cache
 from backend.trading import TradingEndpoint
 from backend.leaderboard import LeaderboardEndpoint
 from backend.tokens import TokenEndpoint
-from backend.accounts_to_database import ENDPOINT as AccountEndpoint
+from backend.accounts_to_database import AccountEndpoint as AccountEndpoint
 
 
 def scheduled_order_processing_job():

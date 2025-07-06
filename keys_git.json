@@ -1,0 +1,7 @@
+{
+    "ALPHA_VANTAGE_API_KEY": "",
+    "GMAIL_APP_PASSWORD": "",
+    "GMAIL_SENDER_ADDRESS": "",
+    "APP_SECRET": "",
+    "_comment": "Inhalt wird erst auf dem Raspberry Pi eingesetzt. Für die Entwicklung wird keys.json verwendet."
+}

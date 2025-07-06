@@ -10,7 +10,7 @@ import sqlite3
 import collections
 from datetime import datetime, timedelta
 
-from backend.accounts_to_database import UTILITIES, ENDPOINT, Settings
+from backend.accounts_to_database import UTILITIES, AccountEndpoint, Settings
 from backend.depot_system import DepotEndpoint
 from yfinance.exceptions import YFPricesMissingError
 
@@ -29,7 +29,7 @@ class LeaderboardEndpoint:
         sortiert nach dem Gesamtvermögen (net_worth).
         """
 
-        user_ids = ENDPOINT.get_all_user_ids(conn)
+        user_ids = AccountEndpoint.get_all_user_ids(conn)
 
         if not user_ids: # keine User = kein Ergebnis
             return []
@@ -165,7 +165,7 @@ class LeaderboardEndpoint:
         Dies ist eine aufwendige Operation.
         """
         print("Starte die Berechnung des Gesamtvermögens für alle Benutzer. Dies kann einen Moment dauern...")
-        all_users = ENDPOINT.get_all_user_ids(conn)
+        all_users = AccountEndpoint.get_all_user_ids(conn)
         for user_id in all_users:
             LeaderboardEndpoint.insert_current_net_worth_for_user(conn, user_id)
         return {"success": True}

@@ -7,7 +7,7 @@ from dataclasses import dataclass
 from typing import Optional
 
 # Lokale Imports
-from backend.accounts_to_database import ENDPOINT as AccountEndpoint
+from backend.accounts_to_database import AccountEndpoint as AccountEndpoint
 from backend.accounts_to_database import UTILITIES
 
 
@@ -152,11 +152,28 @@ class TradingEndpoint:
             return {"success": False, "message": f"Datenbankfehler: {e}"}
 
     @staticmethod
-    def get_user_orders(conn: sqlite3.Connection, user_id: int) -> list[dict]:
-        # ... (keine Änderungen)
+    def get_user_orders(conn: sqlite3.Connection, user_id: int, status_filter: Optional[str] = None) -> list[dict]:
+        """
+        Holt die Aufträge eines Benutzers.
+        :param conn: Datenbankverbindung
+        :param user_id: ID des Benutzers
+        :param status_filter: Optionaler Filter: 'OPEN' oder 'CLOSED'
+        :return: Liste von Aufträgen als Dictionaries
+        """
         conn.row_factory = sqlite3.Row
         cursor = conn.cursor()
-        cursor.execute("SELECT * FROM orders WHERE user_id_fk = ? ORDER BY created_at DESC", (user_id,))
+
+        sql = "SELECT * FROM orders WHERE user_id_fk = ?"
+        params = [user_id]
+
+        if status_filter == 'OPEN':
+            sql += " AND status = 'OPEN'"
+        elif status_filter == 'CLOSED':
+            sql += " AND status != 'OPEN'"
+
+        sql += " ORDER BY created_at DESC"
+
+        cursor.execute(sql, params)
         orders = [dict(row) for row in cursor.fetchall()]
         conn.row_factory = None
         return orders

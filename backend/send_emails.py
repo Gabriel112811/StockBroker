@@ -14,7 +14,7 @@ path = "keys.json" if os.path.exists("keys.json") else "backend/keys.json"
 
 with open(path, 'r') as f:
     daten = json.load(f)
-    SENDER_EMAIL, SENDER_PASSWORD = daten['address'], daten['gmail_app_password']
+    SENDER_EMAIL, SENDER_PASSWORD = daten['GMAIL_SENDER_ADDRESS'], daten['GMAIL_APP_PASSWORD']
 
 # Konfiguration - Sichere Speicherung von Zugangsdaten!
 # Verwende Umgebungsvariablen oder eine Konfigurationsdatei anstelle von Hardcoding.

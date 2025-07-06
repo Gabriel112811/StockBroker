@@ -3,7 +3,7 @@
 import sqlite3
 import yfinance as yf
 import pandas as pd  # yfinance gibt pandas-Datenstrukturen zurück
-from backend.accounts_to_database import ENDPOINT
+from backend.accounts_to_database import AccountEndpoint
 
 
 class DepotEndpoint:
@@ -21,7 +21,7 @@ class DepotEndpoint:
         cursor = conn.cursor()
 
         # 1. Barbestand holen
-        cash_balance = ENDPOINT.get_balance(conn, username=None, user_id=user_id)
+        cash_balance = AccountEndpoint.get_balance(conn, username=None, user_id=user_id)
         if cash_balance is None:
             return None
 

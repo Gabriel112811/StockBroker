@@ -240,7 +240,7 @@ class UTILITIES:
         return result
 
 
-class ENDPOINT:
+class AccountEndpoint:
     """
     Diese Klasse enthält alle Funktionen, die von einem Frontend oder Hauptskript aufgerufen werden können.
     Alle Funktionen akzeptieren ein 'conn'-Objekt und geben unser Protokoll-Dictionary zurück.
@@ -377,7 +377,7 @@ class ENDPOINT:
                 # send_confirmation_email(user_email, username, verification_token)
                 return output
 
-            ENDPOINT.update_last_login_date(conn, user_id)
+            AccountEndpoint.update_last_login_date(conn, user_id)
 
             output["success"] = True
             output["message"] = f"Willkommen zurück, {username}!"
@@ -537,7 +537,7 @@ class ENDPOINT:
         if only_subtract and amount > 0:
             return False
 
-        current_balance = ENDPOINT.get_balance(conn, username=username)
+        current_balance = AccountEndpoint.get_balance(conn, username=username)
         if current_balance is None:
             return False  # Benutzer existiert nicht
 
