@@ -1,0 +1,73 @@
+{% extends "base.html" %}
+{% block title %}Willkommen bei StockBroker{% endblock %}
+
+{% block content %}
+<style>
+    .hero {
+        background: linear-gradient(to right, #6a11cb, #2575fc);
+        color: white;
+        padding: 80px 20px;
+        text-align: center;
+        border-radius: 8px;
+        margin: 20px auto;
+        max-width: 1280px;
+    }
+    .hero h1 {
+        font-size: 3em;
+        margin-bottom: 20px;
+        color: white;
+    }
+    .hero p {
+        font-size: 1.5em;
+        margin-bottom: 30px;
+    }
+    .hero .btn {
+        background-color: #fff;
+        color: #0d6efd;
+        padding: 15px 30px;
+        text-decoration: none;
+        font-size: 1.2em;
+        border-radius: 5px;
+        font-weight: bold;
+    }
+    .features {
+        display: flex;
+        justify-content: space-around;
+        padding: 40px 20px;
+        max-width: 1280px;
+        margin: 0 auto;
+    }
+    .feature {
+        text-align: center;
+        max-width: 300px;
+    }
+    .feature .icon {
+        font-size: 3em;
+        margin-bottom: 20px;
+    }
+</style>
+
+<div class="hero">
+    <h1>Willkommen bei StockBroker</h1>
+    <p>Ihre Plattform für virtuellen Aktienhandel und Wettbewerb.</p>
+    <a href="{{ url_for('register_page') }}" class="btn">Jetzt kostenlos anmelden</a>
+</div>
+
+<div class="features">
+    <div class="feature">
+        <div class="icon">📈</div>
+        <h3>Echtzeit-Aktienkurse</h3>
+        <p>Handele mit virtuellen Aktien zu realen Marktpreisen und echten Auswirkungen.</p>
+    </div>
+    <div class="feature">
+        <div class="icon">🏆</div>
+        <h3>Leaderboard</h3>
+        <p>Schlage deine Freunde und steige an die Spitze der Rangliste.</p>
+    </div>
+    <div class="feature">
+        <div class="icon">📊</div>
+        <h3>Portfolio-Management</h3>
+        <p>Manage dein Depot und verfolgen deine Performance.</p>
+    </div>
+</div>
+{% endblock %}

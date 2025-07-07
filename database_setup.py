@@ -133,6 +133,7 @@ def create_cached_charts_table(conn):
 
 def setup_database(db_path='backend/StockBroker.db'):
     """Führt alle Funktionen zur Erstellung der Tabellen aus."""
+    conn = None
     try:
         conn = sqlite3.connect(db_path)
         print(f"Datenbankverbindung zu '{db_path}' hergestellt.")

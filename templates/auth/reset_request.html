@@ -7,7 +7,9 @@
     <h1>Passwort zurücksetzen</h1>
     {% if not email_sent %}
         <p style="text-align: center; margin-bottom: 20px; color: #6c757d;">
-            Gib deine E-Mail-Adresse ein. Wenn ein Konto existiert, senden wir dir Anweisungen zum Zurücksetzen.
+            Diagnose: Demenz. <br>
+            11/10 Ärzten raten zu Passwortmanagern. <br>
+            Wenn ein Konto existiert, schicken wir dir eine Mail. <br>
         </p>
         <form method="POST" action="{{ url_for('reset_password_request_page') }}">
             <div class="form-group">

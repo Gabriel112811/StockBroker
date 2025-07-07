@@ -232,47 +232,66 @@ class LeaderboardEndpoint:
         return dict(grouped_data)
 
     @staticmethod
-    def decimate_entries(conn:sqlite3.Connection, target:int=500):
+    def decimate_entries(conn:sqlite3.Connection, target:int=1000, use_time_delta=True):
+        use_time_delta = True #INOP
         if target < 10:
             return
         all_data = LeaderboardEndpoint.fetch_and_group_leaderboard(conn)
 
         to_delete_rows = []
+
         for user_id, data in all_data.items():
-            #print(f"betrachte Nutzer {user_id}. Datenlänge: {len(data)}")
-
-            #data = [i for i in data if i["datetime"] <= datetime.now() - timedelta(days=7)]
-
             user_to_delete_rows = []
-            if len(data) >= 2: #gleiche Werte Löschen
+
+            # gleiche Werte Löschen
+            if len(data) >= 2:
                 for i in range(len(data) - 3, -1, -1):
-                    #if len(data) <= target:
-                        #break
-                    #Wir mit neuer in der mitte löschen methode nicht benötigt
+                    # in der Mitte löschen. Es wird bei 3 gleichen Werten der Wert in der mitte gelöscht
+                    if data[i]['net_worth'] == data[i + 1]['net_worth'] == data[i + 2]['net_worth']:
+                        user_to_delete_rows.append(data[i + 1]['row_id'])
+                        data.pop(i + 1)
 
-                    #in der Mitte löschen. Es wird bei 3 gleichen Werten der Wert in der mitte gelöscht
-                    if data[i]['net_worth'] == data[i+1]['net_worth'] == data[i+2]['net_worth']:
-                        user_to_delete_rows.append(data[i+1]['row_id'])
-                        data.pop(i+1)
-                #if len(user_to_delete_rows) > 0:
-                    #print(f"{len(user_to_delete_rows)} doppelte gelöscht")
+            if use_time_delta:
 
-            delta = [data[i]["datetime"] - data[i - 1]["datetime"] for i in range(1, len(data))]
+                delta = [data[i]["datetime"] - data[i - 1]["datetime"] for i in range(1, len(data))]
 
-            while len(data) > target:
-                minimum_delta = min(delta)
-                index_min_delta = delta.index(minimum_delta)
-                if index_min_delta == 0:
-                    index_min_delta = 1
+                while len(data) > target:
+                    minimum_delta = min(delta)
+                    index_min_delta = delta.index(minimum_delta)
+                    if index_min_delta == 0:
+                        index_min_delta = 1
 
-                user_to_delete_rows.append(
-                    data.pop(index_min_delta)["row_id"]
-                )
-                delta[index_min_delta - 1] = delta[index_min_delta - 1] + delta.pop(index_min_delta)
+                    user_to_delete_rows.append(
+                        data.pop(index_min_delta)["row_id"]
+                    )
+                    delta[index_min_delta - 1] = delta[index_min_delta - 1] + delta.pop(index_min_delta)
 
 
-            #print(f"{user_id}: {len(user_to_delete_rows)} wurden gelöscht.")
-            to_delete_rows += user_to_delete_rows
+                #print(f"{user_id}: {len(user_to_delete_rows)} wurden gelöscht.")
+                to_delete_rows += user_to_delete_rows
+            #
+            #
+            # INOP
+            #
+            #
+            if not use_time_delta:
+                if len(data) >= 3:  # gleiche Werte Löschen
+                    relative_derivative_difference = []
+                    for i in range(len(data) - 1):
+                        delta_0_to_1 = (data[i + 1]["net_worth"] - data[i]["net_worth"]) / (data[i + 1]["datetime"] - data[i]["datetime"]).total_seconds()
+                        delta_0_to_2 = (data[i + 2]["net_worth"] - data[i]["net_worth"]) / (data[i + 2]["datetime"] - data[i]["datetime"]).total_seconds()
+
+                    while len(data) > target:
+                        minimum_delta = min(delta)
+                        index_min_delta = delta.index(minimum_delta)
+                        if index_min_delta == 0:
+                            index_min_delta = 1
+
+                        user_to_delete_rows.append(
+                            data.pop(index_min_delta)["row_id"]
+                        )
+                        delta[index_min_delta - 1] = delta[index_min_delta - 1] + delta.pop(index_min_delta)
+
 
         LeaderboardEndpoint.delete_multiple_rows(conn, to_delete_rows)
 

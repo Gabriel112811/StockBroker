@@ -722,7 +722,7 @@ def update_popular_charts_cache(conn):
 def landing_page():
     if 'user_id' in session:
         return redirect(url_for('dashboard_page'))
-    return redirect(url_for('search_stock_page'))
+    return render_template('landingpage.html')
 
 
 @app.route('/dashboard')
