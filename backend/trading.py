@@ -7,13 +7,10 @@ from dataclasses import dataclass
 from typing import Optional
 
 # Lokale Imports
-from backend.accounts_to_database import AccountEndpoint as AccountEndpoint
-from backend.accounts_to_database import Utilities
+from utilities import Utilities
+from accounts_to_database import AccountEndpoint
 
 
-# ==============================================================================
-# === NEUE DATENKLASSE FÜR STRUKTURIERTE AUFTRÄGE ===
-# ==============================================================================
 @dataclass
 class Order:
     order_id: int
@@ -121,7 +118,7 @@ class TradingEndpoint:
             print(f"Market-Trade für User {user_id} ({ticker}) erfolgreich in 'orders' protokolliert.")
         except sqlite3.Error as e:
             # Wenn die Protokollierung fehlschlägt, ist der Trade trotzdem durch.
-            # Wir geben eine Warnung aus, machen aber keinen Rollback der Finanztransaktion.
+            # Wir geben eine Warnung aus, machen aber ein Rollback der Finanztransaktion.
             print(f"WARNUNG: Finanztransaktion erfolgreich, aber Protokollierung in 'orders' fehlgeschlagen: {e}")
 
         return {"success": True, "message": message}
@@ -157,7 +154,7 @@ class TradingEndpoint:
         Holt die Aufträge eines Benutzers.
         :param conn: Datenbankverbindung
         :param user_id: ID des Benutzers
-        :param status_filter: Optionaler Filter: 'OPEN' oder 'CLOSED'
+        :param status_filter: optionaler Filter: 'OPEN' oder 'CLOSED'
         :return: Liste von Aufträgen als Dictionaries
         """
         conn.row_factory = sqlite3.Row

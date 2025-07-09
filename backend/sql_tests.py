@@ -1,4 +1,7 @@
 import sqlite3
+#Alte Testdatei
+#@Fabius
+
 connection = sqlite3.connect("StockBroker.db")
 cursor = connection.cursor()
 def create_table():

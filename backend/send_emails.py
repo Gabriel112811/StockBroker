@@ -1,11 +1,14 @@
+
+## ---KI---
+
 import smtplib
 import os
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from email.header import Header
 from jinja2 import Environment, FileSystemLoader
-
 import json
+import html2text
 
 url = "https://stockbroker.ddns.net"
 
@@ -45,7 +48,6 @@ def _send_email(receiver_email: str, subject: str, html_content: str, text_conte
         message.attach(MIMEText(text_content, "plain", "utf-8"))
     else:
         # Fallback: Erzeuge Text aus HTML (sehr rudimentär, besser expliziten Text bereitstellen)
-        import html2text
         h = html2text.HTML2Text()
         h.ignore_links = True
         text_from_html = h.handle(html_content)

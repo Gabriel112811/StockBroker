@@ -8,13 +8,15 @@ Aktienwerte werden über die yfinance-Bibliothek abgefragt.
 
 import sqlite3
 import collections
-from datetime import datetime, timedelta
-
-from backend.accounts_to_database import Utilities, AccountEndpoint, Settings
-from backend.depot_system import DepotEndpoint
+from datetime import datetime
 from yfinance.exceptions import YFPricesMissingError
 
-link_color = "#e017c0"
+from accounts_to_database import AccountEndpoint
+from user_settings import Settings
+from utilities import Utilities
+from depot_system import DepotEndpoint
+
+link_color = "#e017c0" #Instagram-Farbe
 
 class LeaderboardEndpoint:
     """

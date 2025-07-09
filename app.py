@@ -9,14 +9,17 @@ import sqlite3
 from functools import wraps
 from datetime import datetime, timedelta
 
-# Lokale Imports
 from backend.accounts_to_database import AccountEndpoint
-from backend.accounts_to_database import Utilities
+from backend.utilities import Utilities
 from backend.trading import TradingEndpoint
 from backend.leaderboard import LeaderboardEndpoint
 from backend.depot_system import DepotEndpoint
 from backend.tokens import TokenEndpoint
-from backend.accounts_to_database import Settings
+from backend.user_settings import Settings
+
+#Neues Modul.
+import html2text    # import wird in send_emails.py verwendet. Ist hier, damit die App nicht später einen Fehler wirft,
+                    # sondern gar nicht startet, falls das Modul noch nicht installiert ist.
 
 app = Flask(__name__)
 
