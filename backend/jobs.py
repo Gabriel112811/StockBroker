@@ -1,5 +1,5 @@
 from app import app, get_db, update_popular_charts_cache
-from trading import TradingEndpoint
+from backend.trading import TradingEndpoint
 from backend.leaderboard import LeaderboardEndpoint
 from backend.accounts_to_database import AccountEndpoint
 
