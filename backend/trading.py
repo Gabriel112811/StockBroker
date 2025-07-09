@@ -7,8 +7,8 @@ from dataclasses import dataclass
 from typing import Optional
 
 # Lokale Imports
-from utilities import Utilities
-from accounts_to_database import AccountEndpoint
+from backend.utilities import Utilities
+from backend.accounts_to_database import AccountEndpoint
 
 
 @dataclass

@@ -3,7 +3,7 @@
 import sqlite3
 import yfinance as yf
 import pandas as pd  # yfinance gibt pandas-Datenstrukturen zurück
-from accounts_to_database import AccountEndpoint
+from backend.accounts_to_database import AccountEndpoint
 
 class DepotEndpoint:
     """Bündelt die Logik zur Abfrage und Berechnung von Depot-Daten."""

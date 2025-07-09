@@ -1,1 +1,5 @@
 https://github.com/ProjektQ12/StockBroker/tree/master
+
+scp pi@Pi5:/home/pi/stockbroker/backend/StockBroker.db PycharmProjects/stockbroker/backend/
+scp PycharmProjects/stockbroker/backend/StockBroker.db  pi@Pi5:/home/pi/stockbroker/backend/
+

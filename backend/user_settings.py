@@ -1,5 +1,5 @@
 import sqlite3
-from utilities import Utilities
+from backend.utilities import Utilities
 
 class Settings:
     """Verwaltet die Einstellungen eines Benutzers."""

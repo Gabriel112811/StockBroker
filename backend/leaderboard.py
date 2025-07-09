@@ -11,10 +11,10 @@ import collections
 from datetime import datetime
 from yfinance.exceptions import YFPricesMissingError
 
-from accounts_to_database import AccountEndpoint
-from user_settings import Settings
-from utilities import Utilities
-from depot_system import DepotEndpoint
+from backend.accounts_to_database import AccountEndpoint
+from backend.user_settings import Settings
+from backend.utilities import Utilities
+from backend.depot_system import DepotEndpoint
 
 link_color = "#e017c0" #Instagram-Farbe
 

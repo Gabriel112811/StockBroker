@@ -1,7 +1,7 @@
 import sqlite3
 from datetime import datetime, timedelta
-from utilities import Utilities
-from user_settings import Settings
+from backend.utilities import Utilities
+from backend.user_settings import Settings
 
 if not __name__ == "__main__":
     from backend.tokens import TokenEndpoint

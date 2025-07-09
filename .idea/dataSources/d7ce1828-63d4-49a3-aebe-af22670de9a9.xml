@@ -499,7 +499,7 @@
     </routine>
     <schema id="191" parent="1" name="main">
       <Current>1</Current>
-      <LastIntrospectionLocalTimestamp>2025-07-02.14:40:08</LastIntrospectionLocalTimestamp>
+      <LastIntrospectionLocalTimestamp>2025-07-07.16:33:41</LastIntrospectionLocalTimestamp>
     </schema>
     <argument id="192" parent="16">
       <ArgumentDirection>R</ArgumentDirection>
@@ -1629,14 +1629,16 @@
       <StoredType>TEXT|0s</StoredType>
     </column>
     <column id="569" parent="555" name="money">
+      <DefaultExpression>50000.0</DefaultExpression>
       <NotNull>1</NotNull>
       <Position>6</Position>
       <StoredType>REAL|0s</StoredType>
     </column>
     <column id="570" parent="555" name="joined_date">
+      <DefaultExpression>CURRENT_TIMESTAMP</DefaultExpression>
       <NotNull>1</NotNull>
       <Position>7</Position>
-      <StoredType>TEXT|0s</StoredType>
+      <StoredType>TIMESTAMP|0s</StoredType>
     </column>
     <column id="571" parent="555" name="is_verified">
       <DefaultExpression>0</DefaultExpression>
@@ -1646,7 +1648,7 @@
     </column>
     <column id="572" parent="555" name="last_login">
       <Position>9</Position>
-      <StoredType>DATETIME|0s</StoredType>
+      <StoredType>TIMESTAMP|0s</StoredType>
     </column>
     <index id="573" parent="555" name="sqlite_autoindex_all_users_1">
       <ColNames>username</ColNames>
@@ -1658,290 +1660,320 @@
       <NameSurrogate>1</NameSurrogate>
       <Unique>1</Unique>
     </index>
-    <key id="575" parent="555">
+    <index id="575" parent="555" name="idx_username">
+      <ColNames>username</ColNames>
+    </index>
+    <index id="576" parent="555" name="idx_email">
+      <ColNames>email</ColNames>
+    </index>
+    <key id="577" parent="555">
       <ColNames>user_id</ColNames>
       <Primary>1</Primary>
     </key>
-    <key id="576" parent="555">
+    <key id="578" parent="555">
       <ColNames>username</ColNames>
       <UnderlyingIndexName>sqlite_autoindex_all_users_1</UnderlyingIndexName>
     </key>
-    <key id="577" parent="555">
+    <key id="579" parent="555">
       <ColNames>email</ColNames>
       <UnderlyingIndexName>sqlite_autoindex_all_users_2</UnderlyingIndexName>
     </key>
-    <column id="578" parent="556" name="ticker">
+    <column id="580" parent="556" name="ticker">
+      <NotNull>1</NotNull>
       <Position>1</Position>
       <StoredType>TEXT|0s</StoredType>
     </column>
-    <column id="579" parent="556" name="chart_html">
+    <column id="581" parent="556" name="dark_mode">
       <NotNull>1</NotNull>
       <Position>2</Position>
-      <StoredType>TEXT|0s</StoredType>
-    </column>
-    <column id="580" parent="556" name="dark_mode">
-      <NotNull>1</NotNull>
-      <Position>3</Position>
       <StoredType>INTEGER|0s</StoredType>
     </column>
-    <column id="581" parent="556" name="last_updated">
+    <column id="582" parent="556" name="chart_html">
       <NotNull>1</NotNull>
+      <Position>3</Position>
+      <StoredType>TEXT|0s</StoredType>
+    </column>
+    <column id="583" parent="556" name="company_name">
       <Position>4</Position>
+      <StoredType>TEXT|0s</StoredType>
+    </column>
+    <column id="584" parent="556" name="last_updated">
+      <NotNull>1</NotNull>
+      <Position>5</Position>
       <StoredType>TIMESTAMP|0s</StoredType>
     </column>
-    <index id="582" parent="556" name="sqlite_autoindex_cached_charts_1">
-      <ColNames>ticker</ColNames>
+    <index id="585" parent="556" name="sqlite_autoindex_cached_charts_1">
+      <ColNames>ticker
+dark_mode</ColNames>
       <NameSurrogate>1</NameSurrogate>
       <Unique>1</Unique>
     </index>
-    <key id="583" parent="556">
-      <ColNames>ticker</ColNames>
+    <key id="586" parent="556">
+      <ColNames>ticker
+dark_mode</ColNames>
       <Primary>1</Primary>
       <UnderlyingIndexName>sqlite_autoindex_cached_charts_1</UnderlyingIndexName>
     </key>
-    <column id="584" parent="557" name="id">
+    <column id="587" parent="557" name="id">
       <AutoIncrement>1</AutoIncrement>
       <Position>1</Position>
       <StoredType>INTEGER|0s</StoredType>
     </column>
-    <column id="585" parent="557" name="user_id_fk">
+    <column id="588" parent="557" name="user_id_fk">
       <NotNull>1</NotNull>
       <Position>2</Position>
       <StoredType>INTEGER|0s</StoredType>
     </column>
-    <column id="586" parent="557" name="net_worth">
+    <column id="589" parent="557" name="net_worth">
       <NotNull>1</NotNull>
       <Position>3</Position>
       <StoredType>REAL|0s</StoredType>
     </column>
-    <column id="587" parent="557" name="last_updated">
+    <column id="590" parent="557" name="last_updated">
+      <DefaultExpression>CURRENT_TIMESTAMP</DefaultExpression>
       <NotNull>1</NotNull>
       <Position>4</Position>
-      <StoredType>TEXT|0s</StoredType>
+      <StoredType>TIMESTAMP|0s</StoredType>
     </column>
-    <foreign-key id="588" parent="557">
+    <foreign-key id="591" parent="557">
       <ColNames>user_id_fk</ColNames>
       <OnDelete>cascade</OnDelete>
       <RefColNames>user_id</RefColNames>
       <RefTableName>all_users</RefTableName>
     </foreign-key>
-    <key id="589" parent="557">
+    <index id="592" parent="557" name="idx_leaderboard_user_id">
+      <ColNames>user_id_fk</ColNames>
+    </index>
+    <key id="593" parent="557">
       <ColNames>id</ColNames>
       <Primary>1</Primary>
     </key>
-    <column id="590" parent="558" name="order_id">
+    <column id="594" parent="558" name="order_id">
       <AutoIncrement>1</AutoIncrement>
       <Position>1</Position>
       <StoredType>INTEGER|0s</StoredType>
     </column>
-    <column id="591" parent="558" name="user_id_fk">
+    <column id="595" parent="558" name="user_id_fk">
       <NotNull>1</NotNull>
       <Position>2</Position>
       <StoredType>INTEGER|0s</StoredType>
     </column>
-    <column id="592" parent="558" name="ticker">
+    <column id="596" parent="558" name="ticker">
       <NotNull>1</NotNull>
       <Position>3</Position>
       <StoredType>TEXT|0s</StoredType>
     </column>
-    <column id="593" parent="558" name="order_type">
+    <column id="597" parent="558" name="order_type">
       <NotNull>1</NotNull>
       <Position>4</Position>
       <StoredType>TEXT|0s</StoredType>
     </column>
-    <column id="594" parent="558" name="quantity">
+    <column id="598" parent="558" name="quantity">
       <NotNull>1</NotNull>
       <Position>5</Position>
       <StoredType>INTEGER|0s</StoredType>
     </column>
-    <column id="595" parent="558" name="limit_price">
+    <column id="599" parent="558" name="limit_price">
       <Position>6</Position>
       <StoredType>REAL|0s</StoredType>
     </column>
-    <column id="596" parent="558" name="stop_price">
+    <column id="600" parent="558" name="stop_price">
       <Position>7</Position>
       <StoredType>REAL|0s</StoredType>
     </column>
-    <column id="597" parent="558" name="status">
+    <column id="601" parent="558" name="status">
       <DefaultExpression>&apos;OPEN&apos;</DefaultExpression>
       <NotNull>1</NotNull>
       <Position>8</Position>
       <StoredType>TEXT|0s</StoredType>
     </column>
-    <column id="598" parent="558" name="created_at">
+    <column id="602" parent="558" name="created_at">
       <DefaultExpression>CURRENT_TIMESTAMP</DefaultExpression>
       <NotNull>1</NotNull>
       <Position>9</Position>
       <StoredType>TIMESTAMP|0s</StoredType>
     </column>
-    <column id="599" parent="558" name="executed_at">
+    <column id="603" parent="558" name="executed_at">
       <Position>10</Position>
       <StoredType>TIMESTAMP|0s</StoredType>
     </column>
-    <column id="600" parent="558" name="executed_price">
+    <column id="604" parent="558" name="executed_price">
       <Position>11</Position>
       <StoredType>REAL|0s</StoredType>
     </column>
-    <foreign-key id="601" parent="558">
+    <foreign-key id="605" parent="558">
       <ColNames>user_id_fk</ColNames>
       <OnDelete>cascade</OnDelete>
       <RefColNames>user_id</RefColNames>
       <RefTableName>all_users</RefTableName>
     </foreign-key>
-    <key id="602" parent="558">
+    <index id="606" parent="558" name="idx_orders_user_id">
+      <ColNames>user_id_fk</ColNames>
+    </index>
+    <index id="607" parent="558" name="idx_orders_status">
+      <ColNames>status</ColNames>
+    </index>
+    <key id="608" parent="558">
       <ColNames>order_id</ColNames>
       <Primary>1</Primary>
     </key>
-    <column id="603" parent="559" name="id">
+    <column id="609" parent="559" name="id">
       <AutoIncrement>1</AutoIncrement>
       <Position>1</Position>
       <StoredType>INTEGER|0s</StoredType>
     </column>
-    <column id="604" parent="559" name="user_id_fk">
+    <column id="610" parent="559" name="user_id_fk">
       <Position>2</Position>
       <StoredType>INTEGER|0s</StoredType>
     </column>
-    <column id="605" parent="559" name="token_hash">
+    <column id="611" parent="559" name="token_hash">
       <NotNull>1</NotNull>
       <Position>3</Position>
       <StoredType>TEXT|0s</StoredType>
     </column>
-    <column id="606" parent="559" name="token_type">
+    <column id="612" parent="559" name="token_type">
       <NotNull>1</NotNull>
       <Position>4</Position>
       <StoredType>TEXT|0s</StoredType>
     </column>
-    <column id="607" parent="559" name="created_at">
+    <column id="613" parent="559" name="created_at">
       <DefaultExpression>CURRENT_TIMESTAMP</DefaultExpression>
       <NotNull>1</NotNull>
       <Position>5</Position>
       <StoredType>TIMESTAMP|0s</StoredType>
     </column>
-    <column id="608" parent="559" name="expires_at">
+    <column id="614" parent="559" name="expires_at">
       <NotNull>1</NotNull>
       <Position>6</Position>
       <StoredType>TIMESTAMP|0s</StoredType>
     </column>
-    <foreign-key id="609" parent="559">
+    <foreign-key id="615" parent="559">
       <ColNames>user_id_fk</ColNames>
       <OnDelete>cascade</OnDelete>
       <RefColNames>user_id</RefColNames>
       <RefTableName>all_users</RefTableName>
     </foreign-key>
-    <index id="610" parent="559" name="sqlite_autoindex_secure_tokens_1">
+    <index id="616" parent="559" name="sqlite_autoindex_secure_tokens_1">
       <ColNames>token_hash</ColNames>
       <NameSurrogate>1</NameSurrogate>
       <Unique>1</Unique>
     </index>
-    <key id="611" parent="559">
+    <index id="617" parent="559" name="idx_token_hash">
+      <ColNames>token_hash</ColNames>
+    </index>
+    <key id="618" parent="559">
       <ColNames>id</ColNames>
       <Primary>1</Primary>
     </key>
-    <key id="612" parent="559">
+    <key id="619" parent="559">
       <ColNames>token_hash</ColNames>
       <UnderlyingIndexName>sqlite_autoindex_secure_tokens_1</UnderlyingIndexName>
     </key>
-    <column id="613" parent="560" name="user_id_fk">
+    <column id="620" parent="560" name="user_id_fk">
       <Position>1</Position>
       <StoredType>INTEGER|0s</StoredType>
     </column>
-    <column id="614" parent="560" name="ig_link">
+    <column id="621" parent="560" name="ig_link">
       <Position>2</Position>
       <StoredType>TEXT|0s</StoredType>
     </column>
-    <column id="615" parent="560" name="dark_mode">
+    <column id="622" parent="560" name="dark_mode">
       <DefaultExpression>0</DefaultExpression>
       <NotNull>1</NotNull>
       <Position>3</Position>
       <StoredType>INTEGER|0s</StoredType>
     </column>
-    <column id="616" parent="560" name="last_name_change">
+    <column id="623" parent="560" name="last_name_change">
       <Position>4</Position>
       <StoredType>TIMESTAMP|0s</StoredType>
     </column>
-    <foreign-key id="617" parent="560">
+    <foreign-key id="624" parent="560">
       <ColNames>user_id_fk</ColNames>
       <OnDelete>cascade</OnDelete>
       <RefColNames>user_id</RefColNames>
       <RefTableName>all_users</RefTableName>
     </foreign-key>
-    <key id="618" parent="560">
+    <key id="625" parent="560">
       <ColNames>user_id_fk</ColNames>
       <Primary>1</Primary>
     </key>
-    <column id="619" parent="561" name="type">
+    <column id="626" parent="561" name="type">
       <Position>1</Position>
       <StoredType>TEXT|0s</StoredType>
     </column>
-    <column id="620" parent="561" name="name">
+    <column id="627" parent="561" name="name">
       <Position>2</Position>
       <StoredType>TEXT|0s</StoredType>
     </column>
-    <column id="621" parent="561" name="tbl_name">
+    <column id="628" parent="561" name="tbl_name">
       <Position>3</Position>
       <StoredType>TEXT|0s</StoredType>
     </column>
-    <column id="622" parent="561" name="rootpage">
+    <column id="629" parent="561" name="rootpage">
       <Position>4</Position>
       <StoredType>INT|0s</StoredType>
     </column>
-    <column id="623" parent="561" name="sql">
+    <column id="630" parent="561" name="sql">
       <Position>5</Position>
       <StoredType>TEXT|0s</StoredType>
     </column>
-    <column id="624" parent="562" name="name">
+    <column id="631" parent="562" name="name">
       <Position>1</Position>
     </column>
-    <column id="625" parent="562" name="seq">
+    <column id="632" parent="562" name="seq">
       <Position>2</Position>
     </column>
-    <column id="626" parent="563" name="depot_id">
+    <column id="633" parent="563" name="depot_id">
       <AutoIncrement>1</AutoIncrement>
       <Position>1</Position>
       <StoredType>INTEGER|0s</StoredType>
     </column>
-    <column id="627" parent="563" name="user_id_fk">
+    <column id="634" parent="563" name="user_id_fk">
       <NotNull>1</NotNull>
       <Position>2</Position>
       <StoredType>INTEGER|0s</StoredType>
     </column>
-    <column id="628" parent="563" name="ticker">
+    <column id="635" parent="563" name="ticker">
       <NotNull>1</NotNull>
       <Position>3</Position>
       <StoredType>TEXT|0s</StoredType>
     </column>
-    <column id="629" parent="563" name="quantity">
+    <column id="636" parent="563" name="quantity">
       <NotNull>1</NotNull>
       <Position>4</Position>
       <StoredType>INTEGER|0s</StoredType>
     </column>
-    <column id="630" parent="563" name="average_purchase_price">
+    <column id="637" parent="563" name="average_purchase_price">
       <NotNull>1</NotNull>
       <Position>5</Position>
       <StoredType>REAL|0s</StoredType>
     </column>
-    <column id="631" parent="563" name="last_updated">
+    <column id="638" parent="563" name="last_updated">
+      <DefaultExpression>CURRENT_TIMESTAMP</DefaultExpression>
       <NotNull>1</NotNull>
       <Position>6</Position>
       <StoredType>TIMESTAMP|0s</StoredType>
     </column>
-    <foreign-key id="632" parent="563">
+    <foreign-key id="639" parent="563">
       <ColNames>user_id_fk</ColNames>
       <OnDelete>cascade</OnDelete>
       <RefColNames>user_id</RefColNames>
       <RefTableName>all_users</RefTableName>
     </foreign-key>
-    <index id="633" parent="563" name="sqlite_autoindex_stock_depot_1">
+    <index id="640" parent="563" name="sqlite_autoindex_stock_depot_1">
       <ColNames>user_id_fk
 ticker</ColNames>
       <NameSurrogate>1</NameSurrogate>
       <Unique>1</Unique>
     </index>
-    <key id="634" parent="563">
+    <index id="641" parent="563" name="idx_depot_user_id">
+      <ColNames>user_id_fk</ColNames>
+    </index>
+    <key id="642" parent="563">
       <ColNames>depot_id</ColNames>
       <Primary>1</Primary>
     </key>
-    <key id="635" parent="563">
+    <key id="643" parent="563">
       <ColNames>user_id_fk
 ticker</ColNames>
       <UnderlyingIndexName>sqlite_autoindex_stock_depot_1</UnderlyingIndexName>
