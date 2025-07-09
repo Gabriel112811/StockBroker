@@ -10,7 +10,7 @@ import sqlite3
 import collections
 from datetime import datetime, timedelta
 
-from backend.accounts_to_database import UTILITIES, AccountEndpoint, Settings
+from backend.accounts_to_database import Utilities, AccountEndpoint, Settings
 from backend.depot_system import DepotEndpoint
 from yfinance.exceptions import YFPricesMissingError
 
@@ -105,7 +105,7 @@ class LeaderboardEndpoint:
         #warum nicht auch mal ein set benutzen, da man es sonst ja nie macht,
         #wenn man eh keine duplikate will
         if user_ids:
-            username_map:dict[int, str] = UTILITIES.get_many_usernames(conn, user_ids)
+            username_map:dict[int, str] = Utilities.get_many_usernames(conn, user_ids)
             link_map:dict[int, str] = Settings.get_many_links(conn, user_ids)
         else:
             username_map = {}

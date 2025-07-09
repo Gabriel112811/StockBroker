@@ -63,7 +63,7 @@ def _update_last_login_date(conn: sqlite3.Connection, user_id:int):
     cursor.execute("UPDATE all_users SET last_login = ? WHERE user_id = ?", (login_time, user_id))
 
 
-class UTILITIES:
+class Utilities:
     """Enthält statische Utility-Methoden, die von mehreren Modulen genutzt werden können."""
 
     @staticmethod
@@ -119,7 +119,7 @@ class UTILITIES:
     def verify_password(stored_password_hash: str, stored_salt_hex: str, provided_password: str) -> bool:
         """Überprüft, ob das angegebene Passwort mit dem gespeicherten Hash übereinstimmt."""
         salt = bytes.fromhex(stored_salt_hex)
-        rehashed_password, _ = UTILITIES.hash_password(provided_password, salt)
+        rehashed_password, _ = Utilities.hash_password(provided_password, salt)
         return rehashed_password == stored_password_hash
 
     @staticmethod
@@ -132,7 +132,7 @@ class UTILITIES:
     @staticmethod
     def is_username_valid(conn, username:str) -> dict:
         username = username.lower()
-        output = UTILITIES.get_base_protocol()
+        output = Utilities.get_base_protocol()
         forbidden_words = ["hitler", "penis"]
         forbidden_usernames = ["laurens", "fabius"]
         if len(username) < 3:
@@ -150,14 +150,14 @@ class UTILITIES:
             output["message"] = "Dieser Benutzername ist nicht erlaubt"
             return output
 
-        date = UTILITIES.get_join_date(conn, username)
+        date = Utilities.get_join_date(conn, username)
         if date:
             output["message"] = f"Dieser Benutzername ist bereits seit {_date_to_month_year(date)} vergeben!"
             print(_date_to_month_year(date))
             #evtl ist es nicht so schlau, dass man so von Jeem Nutzer das beitritsdatum sehen kann.
             return output
 
-        output = UTILITIES.get_base_protocol()
+        output = Utilities.get_base_protocol()
         output.update({"success": True, "message":"Verfügbar"})
         return output
 
@@ -177,7 +177,7 @@ class UTILITIES:
         """
         # URLs ohne http/https anfügen, damit urlparse korrekt funktioniert
         if url is None:
-            result = UTILITIES.get_base_protocol()
+            result = Utilities.get_base_protocol()
             result.update({"message":"Die URL ist ungültig"})
             return result
 
@@ -187,14 +187,14 @@ class UTILITIES:
         try:
             parsed_url = urlparse(url)
         except ValueError:
-            result = UTILITIES.get_base_protocol()
+            result = Utilities.get_base_protocol()
             result.update({"message":"Die URL ist ungültig"})
             return result
 
         # 1. Überprüfung der Top-Level-Domain (Netloc)
         # Erlaubt 'instagram.com' oder 'www.instagram.com'
         if parsed_url.netloc not in ['instagram.com', 'www.instagram.com', 'instagram.de', "www.instagram.de"]:
-            result = UTILITIES.get_base_protocol()
+            result = Utilities.get_base_protocol()
             result.update({"message":"Die URL gehört nicht zu Instagram"})
             return result
 
@@ -203,7 +203,7 @@ class UTILITIES:
 
         # Pfad muss vorhanden sein und mehr als nur '/' enthalten
         if not path or path == '/':
-            result = UTILITIES.get_base_protocol()
+            result = Utilities.get_base_protocol()
             result.update({"message":"Du bist Instagram?"})
             return result
 
@@ -213,7 +213,7 @@ class UTILITIES:
         # Prüfen, ob das erste Segment ein bekannter Inhaltspfad ist
         bekannte_inhaltspfade = ['p', 'reel', 'stories', 'tv', 'explore', 'accounts', 'direct']
         if path_segments[0] in bekannte_inhaltspfade:
-            result = UTILITIES.get_base_protocol()
+            result = Utilities.get_base_protocol()
             result.update({"message":"Die URL führt nicht zu einem Profil"})
             return result
 
@@ -224,18 +224,18 @@ class UTILITIES:
         # Instagram-Benutzernamen: 1-30 Zeichen, Buchstaben, Zahlen, Unterstriche, Punkte.
         # Darf nicht mit einem Punkt beginnen oder enden und keine aufeinanderfolgenden Punkte enthalten.
         if '..' in username or not (1 <= len(username) <= 30):
-            result = UTILITIES.get_base_protocol()
+            result = Utilities.get_base_protocol()
             result.update({"message": "ungültiger Instagram Benutzername"})
             return result
 
         # Regex prüft auf gültige Zeichen und stellt sicher, dass Anfang/Ende kein Punkt ist.
         username_regex = r'^[a-z0-9_](?:[a-z0-9_.]*[a-z0-9_])?$'
         if not re.fullmatch(username_regex, username.lower()):  # Instagram-Namen sind case-insensitive
-            result = UTILITIES.get_base_protocol()
+            result = Utilities.get_base_protocol()
             result.update({"message":"Die URL beinhaltet ungültige Zeichen"})
             return result
 
-        result = UTILITIES.get_base_protocol()
+        result = Utilities.get_base_protocol()
         result.update({"success": True, "message":"gültig"})
         return result
 
@@ -248,7 +248,7 @@ class AccountEndpoint:
     @staticmethod
     def create_account(conn: sqlite3.Connection, password: str, email: str, username: str,
                        instant_register_token: str = None) -> dict:
-        output = UTILITIES.get_base_protocol()
+        output = Utilities.get_base_protocol()
         output['email_verification_required'] = False
 
         error_messages = []
@@ -256,7 +256,7 @@ class AccountEndpoint:
         email = _strip_submails(email)
         #username = username.lower()
 
-        if not UTILITIES.is_username_valid(conn, username).get("success"):
+        if not Utilities.is_username_valid(conn, username).get("success"):
             error_messages.append("Da steht doch sogar, dass dieser Benutzername nicht geht!!!")
 
         if not all([password, email, username]):
@@ -296,7 +296,7 @@ class AccountEndpoint:
                 return output
 
         try:
-            hashed_password, salt = UTILITIES.hash_password(password)
+            hashed_password, salt = Utilities.hash_password(password)
             cursor = conn.cursor()
             sql_command = """
                 INSERT INTO all_users (username, password_hash, salt, email, money, joined_date, is_verified, last_login) 
@@ -317,7 +317,7 @@ class AccountEndpoint:
 
             output["success"] = True
             output["user_email"] = email.lower()
-            user_id = UTILITIES.get_user_id(conn, username)
+            user_id = Utilities.get_user_id(conn, username)
 
             if is_verified == 1:
                 output["message"] = f"Willkommen, {username}! Dein Account wurde erstellt und ist sofort aktiv."
@@ -346,7 +346,7 @@ class AccountEndpoint:
 
     @staticmethod
     def login(conn: sqlite3.Connection, username_email: str, password: str) -> dict:
-        output = UTILITIES.get_base_protocol()
+        output = Utilities.get_base_protocol()
         try:
             if _is_email_format_valid(username_email):
 
@@ -365,7 +365,7 @@ class AccountEndpoint:
 
             user_id, username, stored_hash, stored_salt, user_email, is_verified = user_data
 
-            if not UTILITIES.verify_password(stored_hash, stored_salt, password):
+            if not Utilities.verify_password(stored_hash, stored_salt, password):
                 output["message"] = "Falsches Passwort."
                 return output
 
@@ -409,7 +409,7 @@ class AccountEndpoint:
 
     @staticmethod
     def request_password_reset(conn: sqlite3.Connection, email: str) -> dict:
-        output = UTILITIES.get_base_protocol()
+        output = Utilities.get_base_protocol()
         cursor = conn.cursor()
 
         email = _strip_submails(email)
@@ -433,7 +433,7 @@ class AccountEndpoint:
 
     @staticmethod
     def reset_password_with_token(conn: sqlite3.Connection, token: str, new_password: str) -> dict:
-        output = UTILITIES.get_base_protocol()
+        output = Utilities.get_base_protocol()
         token_verification = TokenEndpoint.verify_and_consume_password_token(conn, token)
 
         if not token_verification.get("success"):
@@ -442,7 +442,7 @@ class AccountEndpoint:
 
         user_id = token_verification.get("user_id")
         try:
-            new_hashed_password, new_salt = UTILITIES.hash_password(new_password)
+            new_hashed_password, new_salt = Utilities.hash_password(new_password)
             cursor = conn.cursor()
             update_sql = "UPDATE all_users SET password_hash = ?, salt = ? WHERE user_id = ?"
             cursor.execute(update_sql, (new_hashed_password, new_salt, user_id))
@@ -458,7 +458,7 @@ class AccountEndpoint:
     @staticmethod
     def verify_email_delete_token(conn: sqlite3.Connection, token: str) -> dict:
         """Verifiziert einen E-Mail-Token und aktiviert den Account."""
-        output = UTILITIES.get_base_protocol()
+        output = Utilities.get_base_protocol()
         user_id = TokenEndpoint.verify_email_delete_token(conn, token)
 
         if user_id is None:
@@ -519,7 +519,7 @@ class AccountEndpoint:
         if username is None and user_id is None:
             return None
         if not user_id:
-            user_id = UTILITIES.get_user_id(conn, username)
+            user_id = Utilities.get_user_id(conn, username)
 
         cursor = conn.cursor()
         cursor.execute("SELECT money FROM all_users WHERE user_id = ?", (user_id,))
@@ -572,7 +572,7 @@ class AccountEndpoint:
     @staticmethod
     def update_username(conn: sqlite3.Connection, user_id: int, new_username: str) -> dict:
         """Aktualisiert den Benutzernamen in allen relevanten Tabellen."""
-        if UTILITIES.is_username_in_db(conn, new_username):
+        if Utilities.is_username_in_db(conn, new_username):
             return {"success": False, "message": "Benutzername ist bereits vergeben."}
 
         # In all_users, leaderboard, etc. aktualisieren
@@ -593,7 +593,7 @@ class AccountEndpoint:
     @staticmethod
     def delete_unverified_users(conn: sqlite3.Connection) -> dict:
         """Löscht alle Benutzer, die ihren Account nicht innerhalb von 24 Stunden verifiziert haben."""
-        output = UTILITIES.get_base_protocol()
+        output = Utilities.get_base_protocol()
         try:
             # Berechne den Zeitpunkt vor 24 Stunden
             twenty_four_hours_ago = datetime.now() - timedelta(hours=24)
@@ -652,7 +652,7 @@ class Settings:
     @staticmethod
     def update_instagram_link(conn: sqlite3.Connection, user_id: int, ig_link: str | None):
         """Aktualisiert oder löscht den Instagram-Link eines Benutzers."""
-        if not UTILITIES.is_ig_link_valid(ig_link):
+        if not Utilities.is_ig_link_valid(ig_link):
             return
         sql = "UPDATE settings SET ig_link = ? WHERE user_id_fk = ?"
         conn.execute(sql, (ig_link, user_id))
@@ -681,6 +681,6 @@ class Settings:
 
 if __name__ == "__main__":
     print(
-    UTILITIES.is_ig_link_valid("https://www.instagram.com/gabriel_112811/profilecard/?igsh=MTcxbmFlcXV5NzVkeQ==")
+    Utilities.is_ig_link_valid("https://www.instagram.com/gabriel_112811/profilecard/?igsh=MTcxbmFlcXV5NzVkeQ==")
 )
 

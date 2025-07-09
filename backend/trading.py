@@ -8,7 +8,7 @@ from typing import Optional
 
 # Lokale Imports
 from backend.accounts_to_database import AccountEndpoint as AccountEndpoint
-from backend.accounts_to_database import UTILITIES
+from backend.accounts_to_database import Utilities
 
 
 # ==============================================================================
@@ -88,7 +88,7 @@ class TradingEndpoint:
             return {"success": False, "message": f"Konnte aktuellen Preis für {ticker} nicht abrufen."}
 
         total_cost = price * quantity
-        username = UTILITIES.get_username(conn, user_id)
+        username = Utilities.get_username(conn, user_id)
         order_type = 'MARKET_BUY' if is_buy else 'MARKET_SELL'
         now_str = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
 
@@ -270,7 +270,7 @@ class TradingEndpoint:
             if execute:
                 try:
                     print(f"Führe Auftrag {order.order_id} aus...")
-                    username = UTILITIES.get_username(conn, order.user_id_fk)
+                    username = Utilities.get_username(conn, order.user_id_fk)
                     is_buy = 'BUY' in order.order_type
                     total_value = execution_price * order.quantity
 

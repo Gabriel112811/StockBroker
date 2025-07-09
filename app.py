@@ -11,7 +11,7 @@ from datetime import datetime, timedelta
 
 # Lokale Imports
 from backend.accounts_to_database import AccountEndpoint
-from backend.accounts_to_database import UTILITIES
+from backend.accounts_to_database import Utilities
 from backend.trading import TradingEndpoint
 from backend.leaderboard import LeaderboardEndpoint
 from backend.depot_system import DepotEndpoint
@@ -132,7 +132,7 @@ def do_login(conn, identifier:str=None , password:str=None, instant_login_result
         session['user_id'] = result.get('user_id')
         session['user_email'] = result.get('email')
         if result.get('username') is None:
-            session['username'] = UTILITIES.get_username(conn, result.get('user_id'))
+            session['username'] = Utilities.get_username(conn, result.get('user_id'))
         else:
             session['username'] = result.get('username')
         flash(result.get('message', 'Login erfolgreich!'), 'success')
@@ -238,7 +238,7 @@ def do_email_token_verification(token) -> bool:
         user_id = result.get('user_id')
         LeaderboardEndpoint.insert_current_net_worth_for_user(conn, user_id)
         # conn.commit() # Entfällt, da @app.teardown_appcontext dies übernimmt
-        if do_login(conn, UTILITIES.get_username(conn, user_id), instant_login_result=result):
+        if do_login(conn, Utilities.get_username(conn, user_id), instant_login_result=result):
             return True
     else:
         flash(result.get('message'), 'error')
@@ -294,7 +294,7 @@ def reset_password_confirm_page(token):
             result = AccountEndpoint.reset_password_with_token(conn, token, new_password)
             # conn.commit() # Entfällt, da @app.teardown_appcontext dies übernimmt
             if result.get('success'):
-                username = UTILITIES.get_username(conn, result["user_id"])
+                username = Utilities.get_username(conn, result["user_id"])
                 if do_login(conn, identifier=username, password=new_password):
                     flash(result.get('message', 'Passwort erfolgreich geändert.'), 'success')
                     return redirect(url_for('dashboard_page'))
@@ -1061,12 +1061,14 @@ def settings_page():
     return render_template('settings.html', settings=user_settings, change_status=change_status)
 
 
-# Neue Route für den Live-Check des Benutzernamens
+# Diese Routen werden für den live check des Benutzernamens und Instagram-Link unter dem Eingabefeld verwendet.
+# sehr nice
+
 @app.route('/check_username')
 def check_username():
     name = request.args.get('name', '')
     conn = get_db()
-    response_data = UTILITIES.is_username_valid(conn, name)
+    response_data = Utilities.is_username_valid(conn, name)
     conn.close()
     return jsonify(response_data)
 
@@ -1074,7 +1076,7 @@ def check_username():
 def check_ig_link():
     try:
         link = request.args.get('link', '')
-        response_data = UTILITIES.is_ig_link_valid(link)
+        response_data = Utilities.is_ig_link_valid(link)
         return jsonify(response_data)
     except Exception as e:
         print(e)
@@ -1086,4 +1088,5 @@ def check_ig_link():
 if __name__ == '__main__':
     # siehe init_app_data()
     # use_reloader=False ist wichtig, damit der Scheduler nur einmal startet
+    # Diese Zeilen werden durch das Deployment mit gunicorn aber eh nicht verwendet.
     app.run(debug=True, use_reloader=False)
