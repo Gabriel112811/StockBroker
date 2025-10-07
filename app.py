@@ -1,4 +1,8 @@
 #app.py
+import eventlet
+
+# Das MUSS ganz an den Anfang der Datei!
+eventlet.monkey_patch()
 from flask import Flask, render_template, request, redirect, url_for, flash, session, g, jsonify
 from flask_socketio import SocketIO
 import yfinance as yf
@@ -23,6 +27,7 @@ import html2text    # import wird in send_emails.py verwendet. Ist hier, damit d
                     # sondern gar nicht startet, falls das Modul noch nicht installiert ist.
 
 app = Flask(__name__)
+socketio = SocketIO(app)
 
 ALPHA_VANTAGE_API_KEY = None
 DATABASE_FILE = "backend/StockBroker.db"
@@ -94,7 +99,7 @@ def login_required(f):
         return f(*args, **kwargs)
     return decorated_function
 
-socketio = SocketIO(app)
+
 
 
 @app.route('/cancel_order/<int:order_id>', methods=['POST'])
