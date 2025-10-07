@@ -1,5 +1,6 @@
 #app.py
 from flask import Flask, render_template, request, redirect, url_for, flash, session, g, jsonify
+from flask_socketio import SocketIO
 import yfinance as yf
 import plotly.graph_objects as go
 import math
@@ -93,6 +94,9 @@ def login_required(f):
         return f(*args, **kwargs)
     return decorated_function
 
+socketio = SocketIO(app)
+
+
 @app.route('/cancel_order/<int:order_id>', methods=['POST'])
 @login_required
 def cancel_order_route(order_id):
@@ -100,7 +104,6 @@ def cancel_order_route(order_id):
     db = get_db()
     result = TradingEndpoint.cancel_order(db, session['user_id'], order_id)
     if result.get('success'):
-        # db.commit() # Entfällt, da @app.teardown_appcontext dies übernimmt
         flash(result.get('message'), 'success')
     else:
         flash(result.get('message'), 'error')
@@ -139,7 +142,6 @@ def do_login(conn, identifier:str=None , password:str=None, instant_login_result
         else:
             session['username'] = result.get('username')
         flash(result.get('message', 'Login erfolgreich!'), 'success')
-        # conn.commit() # Entfällt, da @app.teardown_appcontext dies übernimmt
         return True
     else:
         flash(result.get('message', 'Login fehlgeschlagen.'), 'error')
@@ -193,7 +195,6 @@ def register_page():
                                                     instant_register_token=instant_token) #INOP
 
             if result.get('success'):
-                # conn.commit() # Entfällt, da @app.teardown_appcontext dies jetzt übernimmt
                 if result.get('email_verification_required'):
                     # Leite auf eine Seite weiter, die den User anweist, seine E-Mails zu prüfen
                     flash(result.get('message'), 'info')
@@ -236,11 +237,9 @@ def do_email_token_verification(token) -> bool:
     """Testet das Token, flasht das Ergebnis und gibt es in bool zurück."""
     conn = get_db()
     result = AccountEndpoint.verify_email_delete_token(conn, token)
-    # conn.commit() # Entfällt, da @app.teardown_appcontext dies übernimmt
     if result.get('success'):
         user_id = result.get('user_id')
         LeaderboardEndpoint.insert_current_net_worth_for_user(conn, user_id)
-        # conn.commit() # Entfällt, da @app.teardown_appcontext dies übernimmt
         if do_login(conn, Utilities.get_username(conn, user_id), instant_login_result=result):
             return True
     else:
@@ -266,7 +265,6 @@ def reset_password_request_page():
         else:
             conn = get_db()
             AccountEndpoint.request_password_reset(conn, email)
-            # conn.commit()  # Wichtig, damit der Token gespeichert wird -> Übernimmt teardown
             flash('Wenn ein Konto mit dieser E-Mail existiert, wurde eine Anleitung gesendet.', 'info')
             # Man leitet den User direkt zur Token-Eingabe
             return redirect(url_for('reset_password_enter_token_page'))
@@ -1072,7 +1070,7 @@ def check_username():
     name = request.args.get('name', '')
     conn = get_db()
     response_data = Utilities.is_username_valid(conn, name)
-    conn.close()
+    print(response_data)
     return jsonify(response_data)
 
 @app.route('/check_ig_link')
@@ -1092,4 +1090,4 @@ if __name__ == '__main__':
     # siehe init_app_data()
     # use_reloader=False ist wichtig, damit der Scheduler nur einmal startet
     # Diese Zeilen werden durch das Deployment mit gunicorn aber eh nicht verwendet.
-    app.run(debug=True, use_reloader=False)
+    socketio.run(app, debug=True, use_reloader=False)
