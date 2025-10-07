@@ -22,12 +22,16 @@ from backend.depot_system import DepotEndpoint
 from backend.tokens import TokenEndpoint
 from backend.user_settings import Settings
 
+from tichu.multiplayer import register_handlers
+
 #Neues Modul.
 import html2text    # import wird in send_emails.py verwendet. Ist hier, damit die App nicht später einen Fehler wirft,
                     # sondern gar nicht startet, falls das Modul noch nicht installiert ist.
 
 app = Flask(__name__)
 socketio = SocketIO(app)
+
+register_handlers(socketio)
 
 ALPHA_VANTAGE_API_KEY = None
 DATABASE_FILE = "backend/StockBroker.db"
@@ -1087,6 +1091,11 @@ def check_ig_link():
     except Exception as e:
         print(e)
         return jsonify({'success': False, 'message': str(e)})
+
+@app.route("tichu/")
+def tichu_route():
+    """Lädt die Hauptseite für alle Spieler."""
+    return render_template("tichu.html")
 
 
 

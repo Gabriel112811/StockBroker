@@ -1,0 +1,106 @@
+body {
+    background-color: #2e2e2e;
+    color: #f0f0f0;
+    font-family: sans-serif;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    height: 100vh;
+    margin: 0;
+}
+
+.game-board {
+    width: 800px;
+    height: 600px;
+    border: 2px solid #f0f0f0;
+    border-radius: 10px;
+    display: flex;
+    flex-direction: column;
+    padding: 15px;
+    box-sizing: border-box;
+}
+
+.message-area {
+    border: 2px solid #f0f0f0;
+    padding: 10px;
+    margin-bottom: 15px;
+    text-align: center;
+}
+
+.play-area-wrapper {
+    flex-grow: 1; /* Nimmt den verfügbaren Platz ein */
+    border: 2px solid #f0f0f0;
+    margin-bottom: 15px;
+    overflow-y: auto; /* Das erzeugt die Skrollbar (Scrollbar) */
+    padding: 10px;
+}
+
+.play-area {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    min-height: 120px; /* Mindesthöhe, damit man auch in einen leeren Bereich ziehen kann */
+}
+
+.player-hand {
+    border: 2px solid #f0f0f0;
+    min-height: 140px;
+    padding: 10px;
+    display: flex;
+    justify-content: center;
+    align-items: flex-start;
+    gap: 10px;
+    flex-wrap: wrap;
+}
+.player-info {
+    text-align: center;
+    margin-bottom: 10px;
+}
+
+#player-id-display {
+    margin: 0;
+    font-size: 1.2em;
+    color: #a0e0a0;
+
+.controls {
+    display: flex;
+    justify-content: center;
+    margin-top: 15px;
+}
+
+#send-button {
+    padding: 10px 20px;
+    font-size: 16px;
+    cursor: pointer;
+}
+
+/* Karten-Styling */
+.card {
+    width: 80px;
+    height: 120px;
+    background-color: #4a4a4a;
+    border: 1px solid #f0f0f0;
+    border-radius: 5px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    font-size: 20px;
+    font-weight: bold;
+    cursor: grab;
+    user-select: none; /* Verhindert das Markieren von Text beim Ziehen */
+}
+
+.card:active {
+    cursor: grabbing;
+}
+
+/* Visuelles Feedback beim Ziehen */
+.dragging {
+    opacity: 0.5;
+}
+
+/* Visuelles Feedback für die Drop-Zone */
+.drag-over {
+    background-color: #3a5a3a;
+    border-style: dashed;
+}
