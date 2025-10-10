@@ -68,9 +68,34 @@ def process_played_cards(sid, cards_to_play):
 
 def start_game():
     """Initialisiert das Spiel, mischt das Deck und teilt Karten aus."""
-    suits = "HDCS"  # Hearts, Diamonds, Clubs, Spades
-    ranks = "A23456789TJQK"
-    deck = [f"{s}{r}" for s in suits for r in ranks]
+    suits = ["red", "green", "blue", "black"]
+    letters = [str(i) for i in range(2, 10+1)] + ["J", "Q", "K", "A"]
+    values = {rank:i+2 for i, rank in enumerate(letters)}
+    deck = []
+    for suit in suits:
+        for rank in letters:
+            deck.append({
+                "color": suit,
+                "string": rank,
+                "value": values[rank],
+                "is_hund": False,
+                "is_phoenix": False,
+                "is_drache": False,
+                "is_eins": False,
+            })
+    for i in ["Hund", "Phoenix", "Drache", "Eins"]:
+        deck.append({
+            "color": None,
+            "string": i,
+            "value": 1,
+            "is_hund": i is "Hund",
+            "is_phoenix": i is "Phoenix",
+            "is_drache": i is "Drache",
+            "is_eins": i is "Eins"
+        })
+
+    print(deck)
+
     random.shuffle(deck)
 
     player_ids = list(game_state["player_hands"].keys())
@@ -79,8 +104,11 @@ def start_game():
     for i, card in enumerate(deck):
         player_index = i % len(player_ids)
         player_id = player_ids[player_index]
-        if len(game_state["player_hands"][player_id]) < 7:
+        if len(game_state["player_hands"][player_id]) < 12:
             game_state["player_hands"][player_id].append(card)
 
     game_state["message"] = "Das Spiel hat begonnen! Du bist am Zug."
     print("Spiel gestartet, Karten ausgeteilt.")
+
+if __name__ == "__main__":
+    start_game()

@@ -1,5 +1,31 @@
 document.addEventListener('DOMContentLoaded', () => {
 
+    // NEUE HILFSFUNKTION: Übersetzt eine Karten-ID in darstellbare Teile
+function parseCardId(cardId) {
+    // Sonderkarten direkt erkennen
+    const specialCards = ["Drache", "Hund", "Phoenix"];
+    if (specialCards.includes(cardId)) {
+        return { type: 'special', letter: cardId };
+    }
+
+    // Standardkarten (Format "WERT-FARBE", z.B. "A-H" oder "10-P")
+    const parts = cardId.split('-');
+    const wert = parts[0];
+    const farbeCode = parts[1];
+
+    const farbenMap = {
+        'H': 'herz',
+        'K': 'karo',
+        'P': 'pik',
+        'C': 'kreuz'
+    };
+
+    return {
+        type: 'standard',
+        wert: wert,
+        farbe: farbenMap[farbeCode]
+    };
+}
     // --- Verbindung zum Server herstellen ---
     const socket = io();
     let myPlayerId = null; // Wird vom Server zugewiesen
@@ -54,32 +80,47 @@ document.addEventListener('DOMContentLoaded', () => {
     // --- UI Update Funktion (neu) ---
     // Zeichnet die UI komplett neu basierend auf dem globalen game_state vom Server
     function updateUI(state) {
-        // 1. Nachricht aktualisieren
-        messageArea.innerHTML = `<p>${state.message}</p>`;
+    // 1. Nachricht aktualisieren
+    messageArea.innerHTML = `<p>${state.message}</p>`;
 
-        // 2. Ablagebereich aktualisieren
-        playArea.innerHTML = '';
-        state.played_cards.forEach(cardId => {
-            const cardElement = document.createElement('div');
-            cardElement.className = 'card';
-            cardElement.dataset.cardId = cardId;
-            cardElement.innerText = cardId;
-            playArea.appendChild(cardElement);
-        });
+    // Funktion, um ein Karten-Element zu erstellen
+    const createCardElement = (cardId) => {
+        const cardElement = document.createElement('div');
+        cardElement.className = 'card';
+        cardElement.dataset.cardId = cardId;
 
-        // 3. Eigene Hand aktualisieren
-        playerHand.innerHTML = '';
-        const myHandCards = state.player_hands[myPlayerId] || [];
-        myHandCards.forEach(cardId => {
-            const cardElement = document.createElement('div');
-            cardElement.className = 'card';
-            cardElement.dataset.cardId = cardId;
-            cardElement.innerText = cardId;
-            playerHand.appendChild(cardElement);
-        });
+        const cardData = parseCardId(cardId);
 
-        // 4. Drag&Drop-Handler für die neu erstellten Karten registrieren
-        addDragAndDropHandlers();
+        if (cardData.type === 'special') {
+            cardElement.dataset.letter = cardData.letter;
+        } else {
+            cardElement.dataset.farbe = cardData.farbe;
+            cardElement.innerHTML = `
+                <div class="wert oben">${cardData.letter}<span class="symbol"></span></div>
+                <div class="mitte"><span class="symbol"></span></div>
+                <div class="wert unten">${cardData.letter}<span class="symbol"></span></div>
+            `;
+        }
+        return cardElement;
+    };
+
+    // 2. Ablagebereich aktualisieren
+    playArea.innerHTML = '';
+    state.played_cards.forEach(cardId => {
+        const cardElement = createCardElement(cardId);
+        playArea.appendChild(cardElement);
+    });
+
+    // 3. Eigene Hand aktualisieren
+    playerHand.innerHTML = '';
+    const myHandCards = state.player_hands[myPlayerId] || [];
+    myHandCards.forEach(cardId => {
+        const cardElement = createCardElement(cardId);
+        playerHand.appendChild(cardElement);
+    });
+
+    // 4. Drag&Drop-Handler für die neu erstellten Karten registrieren
+    addDragAndDropHandlers();
     }
 
 
@@ -122,12 +163,8 @@ document.addEventListener('DOMContentLoaded', () => {
         // Filtere Duplikate, die schon vorher da lagen
         const cardsFromThisTurn = playedCardIds.filter(card => !game_state_cache.played_cards.includes(card));
 
-        if(cardsFromThisTurn.length > 0){
-             console.log('Sende Karten zum Server:', cardsFromThisTurn);
-             socket.emit('play_cards', { played_cards: cardsFromThisTurn });
-        } else {
-             console.log("Keine neuen Karten im Ablagebereich zum Senden.");
-        }
+        console.log('Sende Karten zum Server:', cardsFromThisTurn);
+        socket.emit('play_cards', { played_cards: cardsFromThisTurn });
     });
 
     // Ein kleiner Cache, um zu wissen, welche Karten schon vorher auf dem Stapel lagen

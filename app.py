@@ -1,10 +1,8 @@
 #app.py
 import eventlet
-
-# Das MUSS ganz an den Anfang der Datei!
 eventlet.monkey_patch()
 from flask import Flask, render_template, request, redirect, url_for, flash, session, g, jsonify
-from flask_socketio import SocketIO
+from flask_socketio import SocketIO, emit
 import yfinance as yf
 import plotly.graph_objects as go
 import math
@@ -13,7 +11,6 @@ import requests
 import sqlite3
 from functools import wraps
 from datetime import datetime, timedelta
-
 from backend.accounts_to_database import AccountEndpoint
 from backend.utilities import Utilities
 from backend.trading import TradingEndpoint
@@ -23,7 +20,7 @@ from backend.tokens import TokenEndpoint
 from backend.user_settings import Settings
 
 from tichu.multiplayer import register_handlers
-
+print("f")
 #Neues Modul.
 import html2text    # import wird in send_emails.py verwendet. Ist hier, damit die App nicht später einen Fehler wirft,
                     # sondern gar nicht startet, falls das Modul noch nicht installiert ist.
@@ -489,7 +486,7 @@ def generate_stock_plotly_chart(ticker_symbol, period="1y", interval="1d", quali
         else:
             font_color = '#cdd3da' if dark_mode else '#1c1e21'
             grid_color = 'rgba(255, 255, 255, 0.1)' if dark_mode else 'rgba(0, 0, 0, 0.1)'
-            
+
             # Farben für Candlesticks definieren
             increasing_color:str = '#1a8754'
             decreasing_color:str = '#FF4136' if dark_mode else '#dc3545'
@@ -514,7 +511,7 @@ def generate_stock_plotly_chart(ticker_symbol, period="1y", interval="1d", quali
             title_text = f'Kurs: {company_name} ({ticker_symbol})<br><span style="font-size:0.8em;">Zeitraum: {period_display}, Auflösung: {interval_display}</span>' if show_axis_titles else ''
 
             yaxis_settings = {
-                "gridcolor": grid_color, "linecolor": grid_color, 
+                "gridcolor": grid_color, "linecolor": grid_color,
                 "zeroline": False, "showticklabels": True
             }
             if not show_axis_titles:  # Dies ist ein Widget
@@ -540,7 +537,7 @@ def generate_stock_plotly_chart(ticker_symbol, period="1y", interval="1d", quali
                     fig.update_xaxes(rangebreaks=[dict(bounds=["sat", "mon"])])
                 elif 'm' in interval or 'h' in interval:
                     fig.update_xaxes(rangebreaks=[
-                        dict(bounds=["sat", "mon"]), 
+                        dict(bounds=["sat", "mon"]),
                         dict(pattern="hour", bounds=[16, 9.5])
                     ])
 
@@ -605,11 +602,11 @@ def create_portfolio_graph(history_data: list[dict], dark_mode: bool = False, li
     history_data.reverse()
     dates = [datetime.fromisoformat(item['date']) for item in history_data]
     net_worths = [item['net_worth'] for item in history_data]
-    
+
     # Startwert ist der erste Wert in der (jetzt chronologischen) Liste
     start_worth = net_worths[0]
     percent_changes = [((val / start_worth) - 1) * 100 if start_worth != 0 else 0 for val in net_worths]
-    
+
     is_gain = net_worths[-1] > start_worth
     bg_color = 'rgba(0,0,0,0)'
 
@@ -709,7 +706,7 @@ def get_or_generate_widget_chart(conn, ticker: str, dark_mode: bool) -> tuple[st
 
 def update_popular_charts_cache(conn):
     """
-    Holt die beliebtesten Aktien und aktualisiert proaktiv deren Charts im Cache 
+    Holt die beliebtesten Aktien und aktualisiert proaktiv deren Charts im Cache
     für beide Modi (hell und dunkel).
     """
     print("[Cache-Job] Starte proaktives Update der beliebten Charts...")
@@ -1061,7 +1058,7 @@ def settings_page():
                     flash(result['message'], 'error')
             else:
                 flash(f"Du kannst deinen Namen erst wieder am {change_status['next_change_date']} ändern.", 'error')
-        
+
         # conn.commit() # Entfällt, da @app.teardown_appcontext dies übernimmt
         return redirect(url_for('settings_page'))
 
@@ -1092,7 +1089,7 @@ def check_ig_link():
         print(e)
         return jsonify({'success': False, 'message': str(e)})
 
-@app.route("tichu/")
+@app.route("/tichu")
 def tichu_route():
     """Lädt die Hauptseite für alle Spieler."""
     return render_template("tichu.html")
@@ -1104,4 +1101,5 @@ if __name__ == '__main__':
     # siehe init_app_data()
     # use_reloader=False ist wichtig, damit der Scheduler nur einmal startet
     # Diese Zeilen werden durch das Deployment mit gunicorn aber eh nicht verwendet.
-    socketio.run(app, debug=True, use_reloader=False)
+    #app.run(debug=True)
+    socketio.run(app, debug=True, use_reloader=False,port=5000)
