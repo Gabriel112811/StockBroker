@@ -57,9 +57,9 @@ def process_played_cards(sid, cards_to_play):
     if not can_play:
         game_state["message"] = f"{player_id}, du hast diese Karten nicht! Ungültiger Zug."
     elif not cards_to_play:
-        game_state["message"] = f"{player_id} hat versucht, keine Karten zu senden."
+        game_state["message"] = f"{player_id} hat gepasst."
     else:
-        game_state["message"] = f"{player_id} hat {', '.join(cards_to_play)} gespielt."
+        game_state["message"] = f"{player_id} hat gespielt."
         # Karten aus der Hand entfernen
         game_state["player_hands"][player_id] = [card for card in player_hand if card not in cards_to_play]
         # Karten zum Ablagestapel hinzufügen
@@ -94,7 +94,6 @@ def start_game():
             "is_eins": i is "Eins"
         })
 
-    print(deck)
 
     random.shuffle(deck)
 

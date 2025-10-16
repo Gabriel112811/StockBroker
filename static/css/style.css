@@ -136,52 +136,67 @@ body {
 }
 
 /* Farben & Symbole via data-Attribute */
-.card[data-farbe="herz"],
-.card[data-farbe="karo"] {
-    color: #D92E2E;
-}
-
-.card[data-farbe="herz"] .symbol::after { content: '♥'; }
-.card[data-farbe="karo"] .symbol::after { content: '♦'; }
-.card[data-farbe="pik"] .symbol::after { content: '♠'; }
-.card[data-farbe="kreuz"] .symbol::after { content: '♣'; }
-
-/* Styling für Sonderkarten */
-.card[data-wert] .wert,
-.card[data-wert] .mitte {
-    display: none;
-}
-
-.card[data-wert]::before {
-    font-size: 1.5em;
+.card {
+    border: 2px solid #aaa;
+    border-radius: 8px;
+    width: 80px;
+    height: 120px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    background-color: white;
+    font-size: 24px;
     font-weight: bold;
+    user-select: none;
+    box-shadow: 2px 2px 5px rgba(0,0,0,0.2);
+}
+
+.card .mitte {
     text-align: center;
-    line-height: 1.2;
-    white-space: pre; /* Erlaubt Zeilenumbrüche wie \a */
 }
 
-.card[data-wert="Drache"] {
-    border: 2px solid #C0392B;
-    background: linear-gradient(135deg, #f5f5f5, #e0e0e0);
-    color: #C0392B;
+
+/* --- FARB-REGELN basierend auf [data-color] --- */
+/* Diese Regeln setzen die Text- und Rahmenfarbe. */
+
+.card[data-color="red"] {
+    color: #D32F2F;
+    border-color: #D32F2F;
 }
-.card[data-wert="Drache"]::before { content: '🐉\aDrache'; }
 
-.card[data-wert="Phoenix"] {
-    border: 2px solid #F39C12;
-    background: linear-gradient(135deg, #FEF9E7, #FAD7A0);
-    color: #D35400;
+.card[data-color="blue"] {
+    color: #1976D2;
+    border-color: #1976D2;
 }
-.card[data-wert="Phoenix"]::before { content: '🔥\aPhönix'; }
 
-.card[data-wert="Hund"] {
-    border: 2px solid #2980B9;
-    background: linear-gradient(135deg, #EBF5FB, #AED6F1);
-    color: #2471A3;
+.card[data-color="green"] {
+    color: #388E3C;
+    border-color: #388E3C;
 }
-.card[data-wert="Hund"]::before { content: '🐕\aHund'; }
 
+.card[data-color="black"] {
+    color: #212121;
+    border-color: #212121;
+}
 
+/* --- SONDERKARTEN-REGELN basierend auf [data-special] --- */
+/* Hier kannst du Sonderkarten ein einzigartiges Aussehen geben. */
+
+.card[data-special="drache"] {
+    background-color: #ffcdd2; /* Leicht roter Hintergrund */
+    font-size: 18px; /* Kleinere Schrift, damit "Drache" passt */
+}
+
+.card[data-special="phoenix"] {
+    background-color: #ffecb3; /* Leicht gelber Hintergrund */
+    box-shadow: 0 0 8px gold; /* Goldener Schein */
+    font-size: 18px;
+}
+
+.card[data-special="hund"] {
+    background-color: #c8e6c9; /* Leicht grüner Hintergrund */
+    font-size: 18px;
+}
 /* Diese Stile für die Drag&Drop-Funktion BEIBEHALTEN! */
 .dragging {
     opacity: 0.5;
