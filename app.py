@@ -1,8 +1,9 @@
 #app.py
 import eventlet
 eventlet.monkey_patch()
+
 from flask import Flask, render_template, request, redirect, url_for, flash, session, g, jsonify
-from flask_socketio import SocketIO, emit
+from flask_socketio import SocketIO, emit, disconnect
 import yfinance as yf
 import plotly.graph_objects as go
 import math
@@ -18,17 +19,15 @@ from backend.leaderboard import LeaderboardEndpoint
 from backend.depot_system import DepotEndpoint
 from backend.tokens import TokenEndpoint
 from backend.user_settings import Settings
+from backend.tichu_to_database import handle_game_move, handle_player_connect, handle_player_disconnect
 
-from tichu.multiplayer import register_handlers
-print("f")
 #Neues Modul.
 import html2text    # import wird in send_emails.py verwendet. Ist hier, damit die App nicht später einen Fehler wirft,
                     # sondern gar nicht startet, falls das Modul noch nicht installiert ist.
 
 app = Flask(__name__)
-socketio = SocketIO(app)
+socketio = SocketIO(app, manage_session=False, cors_allowed_origins="*")
 
-register_handlers(socketio)
 
 ALPHA_VANTAGE_API_KEY = None
 DATABASE_FILE = "backend/StockBroker.db"
@@ -1090,11 +1089,40 @@ def check_ig_link():
         return jsonify({'success': False, 'message': str(e)})
 
 @app.route("/tichu")
+@login_required
 def tichu_route():
     """Lädt die Hauptseite für alle Spieler."""
     return render_template("tichu.html")
 
 
+@socketio.on('connect')
+def on_connect():
+    # Sicherheitscheck: Ist der User eingeloggt?
+    # Wir prüfen, ob user_id in der Session ist.
+    user_id = session.get('user_id')
+
+    if not user_id:
+        # Wenn keine User-ID in der Session ist, Verbindung ablehnen
+        print("Verbindung abgelehnt: Nicht eingeloggt.")
+        disconnect()
+        return
+
+    # request.sid ist die eindeutige ID der aktuellen Socket-Verbindung
+    handle_player_connect(user_id, request.sid)
+
+
+@socketio.on('disconnect')
+def on_disconnect():
+    user_id = session.get('user_id')
+    if user_id:
+        handle_player_disconnect(user_id)
+
+
+@socketio.on('game_message')  # 'game_message' ist der Event-Name, den das JS sendet
+def on_message(data):
+    user_id = session.get('user_id')
+    if user_id:
+        emit('response_event', handle_game_move(user_id, data["content"]))
 
 
 if __name__ == '__main__':
@@ -1102,4 +1130,4 @@ if __name__ == '__main__':
     # use_reloader=False ist wichtig, damit der Scheduler nur einmal startet
     # Diese Zeilen werden durch das Deployment mit gunicorn aber eh nicht verwendet.
     #app.run(debug=True)
-    socketio.run(app, debug=True, use_reloader=False,port=5000)
+    socketio.run(app, debug=True, use_reloader=False, port=5001)

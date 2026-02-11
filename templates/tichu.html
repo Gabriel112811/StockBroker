@@ -2,35 +2,85 @@
 <html lang="de">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Kartenspiel UI</title>
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <title>Game Socket Test</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.0.1/socket.io.js"></script>
+
+    <style>
+        body { font-family: sans-serif; padding: 20px; }
+        #log {
+            border: 1px solid #ccc;
+            padding: 10px;
+            height: 300px;
+            overflow-y: scroll;
+            background: #f9f9f9;
+            margin-top: 10px;
+        }
+        .message { margin-bottom: 5px; border-bottom: 1px solid #eee; }
+        .server-msg { color: blue; }
+        .client-msg { color: green; }
+        #status { font-weight: bold; color: red; }
+    </style>
 </head>
 <body>
 
-    <div class="game-board">
-        <div class="player-info">
-            <h2 id="player-id-display">Verbinde...</h2>
-        </div>
+    <h1>Socket Verbindungstest</h1>
+    <p>Status: <span id="status">Getrennt</span></p>
 
-        <div class="message-area" id="message-area">
-            <p>Warte auf Server...</p>
-        </div>
-
-        <div class="play-area-wrapper">
-            <div class="play-area" id="play-area">
-                </div>
-        </div>
-
-        <div class="player-hand" id="player-hand">
-            </div>
-
-        <div class="controls">
-            <button id="send-button">Senden</button>
-        </div>
+    <div>
+        <input type="text" id="input_message" placeholder="Gib deinen Spielzug ein...">
+        <button onclick="sendMessage()">Senden</button>
     </div>
 
-    <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
-    <script src="{{ url_for('static', filename='js/main.js') }}"></script>
+    <h3>Log:</h3>
+    <div id="log"></div>
+
+    <script type="text/javascript">
+        // 1. Verbindung zum Server herstellen
+        var socket = io();
+
+        // --- EREIGNISSE VOM SERVER EMPFANGEN ---
+
+        // Wenn Verbindung erfolgreich hergestellt
+        socket.on('connect', function() {
+            document.getElementById('status').innerText = 'Verbunden!';
+            document.getElementById('status').style.color = 'green';
+            addLog("System: Verbunden mit Server", "black");
+        });
+
+        // Wenn der Server eine Antwort sendet (Event-Name: 'response_event')
+        socket.on('response_event', function(data) {
+            // data ist das JSON, das vom Python Server kommt
+            addLog("Server antwortet: " + JSON.stringify(data), "blue");
+        });
+
+        // --- NACHRICHTEN AN DEN SERVER SENDEN ---
+
+        function sendMessage() {
+            var inputField = document.getElementById('input_message');
+            var text = inputField.value;
+
+            if(text) {
+                // Sende an das Python Event 'game_message'
+                socket.emit('game_message', { content: text });
+
+                addLog("Du sendest: " + text, "green");
+                inputField.value = ''; // Feld leeren
+            }
+        }
+
+        // Hilfsfunktion zum Anzeigen von Text im Log-Div
+        function addLog(text, color) {
+            var logDiv = document.getElementById('log');
+            var msgDiv = document.createElement('div');
+            msgDiv.className = 'message';
+            msgDiv.style.color = color;
+            msgDiv.innerText = text;
+            logDiv.appendChild(msgDiv);
+
+            // Automatisch nach unten scrollen
+            logDiv.scrollTop = logDiv.scrollHeight;
+        }
+    </script>
+
 </body>
 </html>
